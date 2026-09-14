@@ -1,0 +1,1847 @@
+import { useEffect, useMemo, useState } from "react";
+import { apiPost } from "../../api/client.js";
+import { getLeadsApi } from "../../api/lead.api.js";
+
+const AIRLINES = [
+    ["Emirates", "#D71920"],
+    ["Qatar Airways", "#5C0632"],
+    ["Etihad Airways", "#BD8B13"],
+    ["Turkish Airlines", "#C70A0C"],
+    ["British Airways", "#1D4F91"],
+    ["Virgin Atlantic", "#D6001C"],
+    ["Lufthansa", "#05164D"],
+    ["Air France", "#002157"],
+    ["KLM", "#0091DA"],
+    ["Iberia", "#C8102E"],
+    ["TAP Air Portugal", "#00805B"],
+    ["Swiss", "#E2001A"],
+    ["Austrian Airlines", "#D40F14"],
+    ["Brussels Airlines", "#E2001A"],
+    ["SAS", "#003D87"],
+    ["Finnair", "#0B1560"],
+    ["Aer Lingus", "#00847C"],
+    ["LOT", "#123B73"],
+    ["ITA Airways", "#005B96"],
+    ["Icelandair", "#003B71"],
+    ["Aegean", "#003B70"],
+    ["Singapore Airlines", "#1B2A5B"],
+    ["Cathay Pacific", "#006564"],
+    ["Qantas", "#E40000"],
+    ["ANA", "#13448F"],
+    ["Japan Airlines", "#C8102E"],
+    ["Korean Air", "#00256C"],
+    ["Thai Airways", "#5A277E"],
+    ["Malaysia Airlines", "#16528C"],
+    ["EVA Air", "#007A53"],
+    ["United Airlines", "#002244"],
+    ["Delta Air Lines", "#003366"],
+    ["American Airlines", "#0078D2"],
+    ["Alaska Airlines", "#01426A"],
+    ["JetBlue", "#003876"],
+    ["Southwest", "#304CB2"],
+    ["Air Canada", "#D82B2F"],
+    ["WestJet", "#00A3E0"],
+    ["Aeromexico", "#003D7C"],
+    ["LATAM", "#211466"],
+    ["Avianca", "#DA291C"],
+    ["Copa Airlines", "#005DAA"],
+    ["Air India", "#D71920"],
+    ["IndiGo", "#1D3F94"],
+    ["Vistara", "#5A2D82"],
+    ["SpiceJet", "#C8102E"],
+    ["Saudia", "#006C35"],
+    ["flydubai", "#E65C2F"],
+    ["Gulf Air", "#D5A928"],
+    ["Oman Air", "#B38B59"],
+    ["Air Arabia", "#E31837"],
+    ["Ethiopian", "#2E7D32"],
+    ["EgyptAir", "#002F6C"],
+    ["Royal Air Maroc", "#B01E36"],
+    ["South African Airways", "#005DAA"],
+
+    ["Carnival Cruise Line", "#D71920"],
+    ["Royal Caribbean", "#003B70"],
+    ["Norwegian Cruise Line", "#003B70"],
+    ["MSC Cruises", "#003B70"],
+    ["Princess Cruises", "#7A1F5B"],
+    ["Celebrity Cruises", "#222222"],
+    ["Holland America", "#003B70"],
+    ["Disney Cruise Line", "#111111"],
+    ["Costa Cruises", "#0072CE"],
+    ["Virgin Voyages", "#D6001C"],
+];
+
+const HEADER_TYPES = [
+    ["new_booking", "New Booking"],
+    ["new_miles", "New Booking with Miles"],
+    ["changes", "Changes"],
+    ["seat_selection", "Seat Selection"],
+    ["pet_cabin", "Pet-In-Cabin"],
+    ["name_correction", "Name Correction"],
+    ["dob_correction", "DOB Correction"],
+    ["unmr", "UNMR Reservation"],
+    ["ticket_reissue", "Ticket Re-Issuance"],
+    ["cancel_credit", "Cancellation with Credit"],
+    ["cancel_refund", "Cancellation with Refund"],
+    ["cancel_miles_refund", "Cancellation with Miles & Refund"],
+    ["cancel_reissue", "Cancel & Re-Issue"],
+    ["cancel_rebook", "Cancel & Re-Book"],
+    ["other", "Other (write manually)"],
+];
+
+const CARD_TYPES = [
+    "Visa",
+    "Mastercard",
+    "Amex",
+    "Discover",
+    "Diners",
+    "RuPay",
+    "Other",
+];
+
+const CURRENCIES = {
+    USD: "$",
+    INR: "₹",
+    EUR: "€",
+    GBP: "£",
+    AED: "د.إ",
+    CAD: "C$",
+    AUD: "A$",
+    SGD: "S$",
+    SAR: "﷼",
+    THB: "฿",
+};
+
+const DEFAULT_GREETING = `Dear {pax},
+
+Greetings of the day!
+
+We would like you to go through your itinerary carefully. Please revert back on the same email “I Authorized” only when you have checked all the information and you are completely satisfied with the itinerary and price.
+
+As per our conversation and as agreed, we have booked your itinerary as follows:`;
+
+const DEFAULT_TERMS = `Booking Acknowledgment
+
+By confirming your booking, you agree that you've read, understood, and accepted these terms.
+
+Reconfirmation
+
+Flights must be reconfirmed directly through our agency 72 hours before the reservation date.
+
+Special requests (meals, seats, wheelchair, hotel, etc.) must be reconfirmed with us at least 72 hours before travel and are subject to availability.
+
+Changes & Cancellations
+
+Bookings are changeable and refundable.
+
+Refunds (if applicable) are subject to airline penalties and agency service fees.
+
+No chargebacks will be accepted once the airline processes a refund.
+
+Name corrections may be allowed (typos only), subject to airline policy and fees.
+
+Travel Documents
+
+You are responsible for having valid visas and travel documents. We are not liable for denied entry or boarding.
+
+Refunds on Agency/Third-Party Bookings
+
+Refunds go to the issuing agency. Contact them directly. No chargebacks will be accepted by our agency.
+
+Disputes
+
+If you have any questions or disputes, please contact us directly. We are committed to resolving issues promptly and efficiently. Please note, we do not entertain disputes filed directly through your bank.
+
+Promotions
+
+We may contact you for promotional or advertising purposes.
+
+Declaration
+
+If our agency is required to take legal action to enforce these Terms and Conditions, you agree to cover all related legal fees, litigation costs, and any other remedies entitled by law. By confirming this booking, you acknowledge that the travel dates and times are accurate, your name matches your government-issued ID or passport, and you are aware of all applicable fare rules and conditions. You also agree to reconfirm your flight at least 72 hours prior to departure.
+
+Customer Support
+
+Our customer support team is available to assist you with any questions or concerns regarding your booking. We are committed to providing timely responses to ensure your travel experience is smooth.
+
+Itinerary Changes
+
+Should your itinerary change, please contact us immediately. While we will do our best to accommodate any changes, additional fees may apply based on airline policies.
+
+Force Majeure
+
+Reservations Desk is not liable for any failure to perform our obligations under these terms due to circumstances beyond our control, including but not limited to natural disasters, war, terrorism, or changes in government regulations.
+
+Promotional Communications
+
+By booking with us, you consent to receive promotional materials and communications from Reservations Desk. You may opt out at any time by contacting us directly.
+
+Refund Processing Time
+
+Refunds will be processed only after we receive the approved amount from the airline. Please note that this may take up to 12-16 weeks in accordance with airline policies.
+
+Communication Regarding Refunds
+
+We will keep you informed throughout the refund process. Once we receive confirmation from the airline, we will notify you immediately and initiate the refund to your original payment method.
+
+Non-Refundable Fees
+
+Certain fees, such as service fees and processing charges, may be non-refundable regardless of the airline's refund policy.
+
+Policy Changes
+
+Airline policies regarding refunds and processing times are subject to change. We recommend checking with us or the airline for the most current information if your travel plans are affected.
+
+Dispute Resolution for Refunds
+
+If there are any discrepancies regarding your refund or if you do not receive it within the expected time frame, please contact us directly.
+
+Final Confirmation
+
+By proceeding with this booking, you confirm that all details regarding dates and times are accurate, your name is correct as it appears on your passport, you are aware of all fare rules and conditions, and you will reconfirm your flights 72 hours prior to departure.`;
+
+const emptyDraft = () => ({
+    airline: "",
+    airlineColor: "#5C0632",
+    customAirlineColor: false,
+    bannerImage: "",
+
+    bookingNo: "",
+    subjectTpl: "{airline} | {service} | {booking}",
+
+    headerType: "new_booking",
+    headerLabel: "New Booking",
+    headerLine: "",
+
+    greeting: DEFAULT_GREETING,
+
+    passengers: [{ name: "", dob: "" }],
+    paxEmail: "",
+
+    itineraryText: "",
+    itineraryImages: [],
+
+    merchants: [{ name: "", amount: "", breakdown: "" }],
+    currency: "USD",
+
+    cardName: "",
+    cardNumber: "",
+    cardLast4: "",
+    cardType: "Visa",
+    cardExpiry: "",
+    billingAddress: "",
+
+    terms: DEFAULT_TERMS,
+
+    employeeName: "",
+    employeePhone: "",
+
+    creditAmount: "",
+    cancelFee: "",
+    refundAmount: "",
+    refundMethod: "Original Payment Method",
+    refundTimeline: "",
+
+    newBookingNo: "",
+
+    milesUsed: "",
+    milesDollars: "",
+
+    seatMap: [],
+
+    petName: "",
+    petBreed: "",
+    petWeight: "",
+    petAge: "",
+    petPayMethod: "",
+    petPayAmount: "",
+});
+
+const headerMessage = (type, draft) => {
+    const total = draft.merchants.reduce(
+        (sum, m) => sum + Number(m.amount || 0),
+        0
+    );
+
+    const money = `${CURRENCIES[draft.currency] || "$"}${total.toFixed(2)}`;
+
+    switch (type) {
+        case "refund":
+            return `Your refund request has been processed as requested. The applicable refund amount is ${money}.`;
+
+        case "name_correction":
+            return "The passenger name has been corrected as requested.";
+
+        case "dob_correction":
+            return "The date of birth has been corrected as requested.";
+
+        case "new_booking_miles":
+            return `Your new booking has been confirmed using the applicable miles and payment details.`;
+
+        case "seat_selection":
+            return "Your seat selection has been confirmed as requested: ____.";
+
+        case "unmr":
+            return "An Unaccompanied Minor (UNMR) reservation has been arranged as requested. Our team will coordinate the required assistance throughout the minor’s journey.";
+
+        case "ticket_reissue":
+            return "Your ticket has been re-issued as requested. Please review the updated details below.";
+
+        case "pet_in_cabin":
+            if (draft.petPayMethod === "Online Payment") {
+                return "Your pet-in-cabin request has been arranged as requested. The pet-in-cabin fee has been collected via online payment.";
+            }
+
+            if (draft.petPayMethod === "Pay at desk") {
+                return "Your pet-in-cabin request has been arranged as requested. A pet-in-cabin fee is payable at the airport check-in desk.";
+            }
+
+            return "Your pet-in-cabin request has been arranged as requested.";
+
+        case "cancellation":
+            return "Your cancellation request has been processed as requested.";
+
+        default:
+            return "";
+    }
+};
+
+const primaryPassenger = (draft) =>
+    draft.passengers.find((p) => p.name.trim())?.name || "Passenger";
+
+const replacePlaceholders = (text, draft) => {
+    const total = draft.merchants.reduce(
+        (sum, m) => sum + Number(m.amount || 0),
+        0
+    );
+
+    return String(text || "")
+        .replaceAll("{pax}", primaryPassenger(draft))
+        .replaceAll("{agency}", "Reservations Desk")
+        .replaceAll("{airline}", draft.airline || "Airline")
+        .replaceAll(
+            "{amount}",
+            `${CURRENCIES[draft.currency] || "$"}${total.toFixed(2)}`
+        )
+        .replaceAll("{last4}", draft.cardLast4 || "____");
+};
+
+const makeSubject = (draft) =>
+    replacePlaceholders(
+        draft.subjectTpl || "{airline} | {service} | {booking}",
+        draft
+    )
+        .replaceAll(
+            "{service}",
+            draft.headerLabel || "Booking"
+        )
+        .replaceAll("{booking}", draft.bookingNo || "")
+        .trim();
+
+const formatPhone = (value) =>
+    value.replace(/\D/g, "").slice(0, 10);
+
+const imageToDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+
+        reader.readAsDataURL(file);
+    });
+
+const buildEmailHtml = (draft, acceptanceUrl = "#") => {
+    const greeting = replacePlaceholders(draft.greeting, draft);
+    const terms = replacePlaceholders(draft.terms, draft);
+    const message = replacePlaceholders(draft.headerLine, draft);
+
+    const flights = draft.itineraryText
+        ? draft.itineraryText
+            .split("\n")
+            .filter(Boolean)
+            .map(
+                (line) =>
+                    `<div style="padding:7px 0;border-bottom:1px solid #e5e7eb;font-family:Arial;font-size:13px;color:#263248">${escapeHtml(
+                        line
+                    )}</div>`
+            )
+            .join("")
+        : `<div style="color:#777;font-family:Arial;font-size:13px">No itinerary text added.</div>`;
+
+    const merchants = draft.merchants
+        .filter((m) => m.name || m.amount)
+        .map(
+            (m) => `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #eee;font-family:Arial">${escapeHtml(
+                m.name
+            )}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee;font-family:Arial;text-align:right">${CURRENCIES[draft.currency]
+                }${Number(m.amount || 0).toFixed(2)}</td>
+        </tr>
+        ${m.breakdown
+                    ? `<tr><td colspan="2" style="padding:0 8px 8px;color:#6b7280;font:12px Arial">${escapeHtml(
+                        m.breakdown
+                    )}</td></tr>`
+                    : ""
+                }
+      `
+        )
+        .join("");
+
+    const passengers = draft.passengers
+        .filter((p) => p.name)
+        .map(
+            (p) =>
+                `<tr><td style="padding:7px 0;font:13px Arial">${escapeHtml(
+                    p.name
+                )}</td><td style="padding:7px 0;font:13px Arial;text-align:right">${p.dob || "____"
+                }</td></tr>`
+        )
+        .join("");
+
+    const total = draft.merchants.reduce(
+        (sum, m) => sum + Number(m.amount || 0),
+        0
+    );
+
+    const snips = draft.itineraryImages
+        .map(
+            (img) =>
+                `<img src="${img}" alt="Itinerary" style="width:100%;display:block;margin:10px 0;border-radius:8px">`
+        )
+        .join("");
+
+    return `
+<!doctype html>
+<html>
+<body style="margin:0;background:#f4f6f8;padding:24px">
+<div style="max-width:760px;margin:auto;background:#fff;border:1px solid #e2e5e9;border-radius:14px;overflow:hidden">
+
+  ${draft.bannerImage
+            ? `<div style="text-align:center;padding:14px;background:#fff">
+          <img src="${draft.bannerImage}" alt="Banner" style="max-width:100%;max-height:150px;object-fit:contain">
+         </div>`
+            : ""
+        }
+
+  <div style="padding:24px 28px;border-bottom:1px solid #eee">
+    <div
+  style="
+    background:${draft.airlineColor || "#16233D"};
+    color:#ffffff;
+    padding:28px 30px;
+    font-family:Arial,Helvetica,sans-serif;
+    bordaer
+  "
+>
+  <div
+    style="
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:2px;
+      text-transform:uppercase;
+      color:#ffffff;
+      margin-bottom:8px;
+    "
+  >
+    ${escapeHtml(draft.headerLabel || "New Booking")}
+  </div>
+
+  <div
+    style="
+      font-size:30px;
+      line-height:1.15;
+      font-weight:700;
+      color:#ffffff;
+    "
+  >
+    ${escapeHtml(draft.airline || "Airline")}
+  </div>
+
+  ${draft.bookingNo
+            ? `
+        <div
+          style="
+            margin-top:14px;
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:1px;
+            text-transform:uppercase;
+            color:#ffffff;
+            opacity:.9;
+          "
+        >
+          Booking Ref
+        </div>
+
+        <div
+          style="
+            margin-top:3px;
+            font-size:14px;
+            font-weight:700;
+            color:#ffffff;
+          "
+        >
+          ${escapeHtml(draft.bookingNo)}
+        </div>
+      `
+            : ""
+        }
+</div>
+
+    <div style="font:700 14px Arial;color:#172033;margin-top:7px">
+      ${escapeHtml(draft.headerLabel)}
+    </div>
+    ${draft.bookingNo
+            ? `<div style="font:12px Arial;color:#737b88;margin-top:5px">PNR / Booking: ${escapeHtml(
+                draft.bookingNo
+            )}</div>`
+            : ""
+        }
+  </div>
+
+  <div style="padding:25px 28px">
+
+    ${paragraphHtml(greeting)}
+
+    ${message
+            ? `<div style="font:14px Arial;color:#263248;line-height:1.65;margin:15px 0">${paragraphHtml(
+                message
+            )}</div>`
+            : ""
+        }
+
+    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px">
+      Passengers
+    </h3>
+
+    <table width="100%" cellspacing="0">
+      <thead>
+        <tr>
+          <th align="left" style="font:12px Arial;color:#777">Passenger</th>
+          <th align="right" style="font:12px Arial;color:#777">DOB</th>
+        </tr>
+      </thead>
+      <tbody>${passengers}</tbody>
+    </table>
+
+    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
+      Flight Itinerary
+    </h3>
+
+    <div style="border:1px solid #e5e7eb;border-radius:9px;padding:12px">
+      ${flights}
+    </div>
+
+    ${snips}
+
+    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
+      Charges
+    </h3>
+
+    <table width="100%" cellspacing="0" style="border-collapse:collapse">
+      <tbody>${merchants}</tbody>
+      <tfoot>
+        <tr>
+          <td style="padding:12px 8px;font:700 14px Arial">Total</td>
+          <td style="padding:12px 8px;font:700 14px Arial;text-align:right">${CURRENCIES[draft.currency]
+        }${total.toFixed(2)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
+      Card Authorization
+    </h3>
+
+    <div style="font:13px Arial;line-height:1.8;color:#394150">
+      <b>Cardholder:</b> ${escapeHtml(draft.cardName || "____")}<br>
+      <b>Card Type:</b> ${escapeHtml(draft.cardType)}<br>
+      <b>Card:</b> •••• ${escapeHtml(draft.cardLast4 || "____")}<br>
+      <b>Expiry:</b> ${escapeHtml(draft.cardExpiry || "____")}<br>
+      <b>Billing Address:</b> ${escapeHtml(
+            draft.billingAddress || "____"
+        )}
+    </div>
+
+    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
+      Terms & Conditions
+    </h3>
+
+    <div style="max-height:260px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:14px">
+      ${termsToEmailHtml(terms)}
+    </div>
+
+    <div style="margin-top:22px;padding:18px;background:#f7f8fa;border-radius:10px">
+      <div style="font:700 13px Arial;color:#172033;margin-bottom:8px">
+        Authorization
+      </div>
+
+      <div style="font:13px Arial;color:#4b5563;line-height:1.6">
+        By replying with “I Authorize” you confirm that you are the cardholder named above, that the details shown are correct, and that you authorize to charge your card for the services described.
+      </div>
+
+      <div style="text-align:center;margin-top:18px">
+        <a href="${acceptanceUrl}"
+           style="display:inline-block;background:#172033;color:#fff;text-decoration:none;padding:12px 25px;border-radius:7px;font:700 13px Arial">
+          I Authorize
+        </a>
+      </div>
+    </div>
+
+    <div style="margin-top:30px;border-top:1px solid #eee;padding-top:18px">
+      <div style="font:700 13px Arial;color:#172033">
+        ${escapeHtml(draft.employeeName || "Employee")}
+      </div>
+      <div style="font:13px Arial;color:#555;margin-top:3px">
+        Reservations Desk
+      </div>
+      ${draft.employeePhone
+            ? `<div style="font:13px Arial;color:#555;margin-top:3px">${escapeHtml(
+                draft.employeePhone
+            )}</div>`
+            : ""
+        }
+    </div>
+
+  </div>
+</div>
+</body>
+</html>`;
+};
+
+const paragraphHtml = (text) =>
+    String(text || "")
+        .split(/\n{2,}/)
+        .map(
+            (p) =>
+                `<p style="margin:0 0 12px;font:14px/1.65 Arial;color:#2a3244">${escapeHtml(
+                    p
+                ).replace(/\n/g, "<br>")}</p>`
+        )
+        .join("");
+
+const termsToEmailHtml = (text) =>
+    String(text || "")
+        .split("\n")
+        .map((line) => {
+            if (!line.trim()) return "";
+
+            const heading =
+                line.length < 46 &&
+                !/[.!?:]$/.test(line.trim()) &&
+                line.trim().split(/\s+/).length <= 6;
+
+            return heading
+                ? `<div style="font:700 12px Arial;color:#172033;margin:13px 0 5px">${escapeHtml(
+                    line
+                )}</div>`
+                : `<div style="font:11.5px/1.55 Arial;color:#4b5563;margin-bottom:5px">${escapeHtml(
+                    line
+                )}</div>`;
+        })
+        .join("");
+
+const escapeHtml = (value) =>
+    String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+const Field = ({ label, required, children, hint }) => (
+    <div className="space-y-2">
+        <label className="block text-sm font-semibold text-slate-700">
+            {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        {children}
+        {hint && <p className="text-xs text-slate-500">{hint}</p>}
+    </div>
+);
+
+const inputClass =
+    "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100";
+
+const Section = ({ number, title, children }) => (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                {number}
+            </div>
+            <div>
+                <h2 className="font-semibold text-slate-900">{title}</h2>
+            </div>
+        </div>
+        <div className="space-y-5 p-5">{children}</div>
+    </section>
+);
+
+export default function EmailBuilder() {
+    const [draft, setDraft] = useState(emptyDraft);
+    const [airlineSearch, setAirlineSearch] = useState("");
+    const [activeTab, setActiveTab] = useState("draft");
+    const [leads, setLeads] = useState([]);
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+    const [sending, setSending] = useState(false);
+
+    useEffect(() => {
+        getLeadsApi()
+            .then((res) => setLeads(res?.data || []))
+            .catch(() => { });
+    }, []);
+
+    const filteredAirlines = useMemo(() => {
+        const q = airlineSearch.trim().toLowerCase();
+
+        if (!q) return AIRLINES;
+
+        return AIRLINES.filter(([name]) =>
+            name
+                .toLowerCase()
+                .split(/\s+/)
+                .some((word) => word.includes(q)) ||
+            name.toLowerCase().includes(q)
+        );
+    }, [airlineSearch]);
+
+    const update = (key, value) => {
+        setDraft((old) => ({
+            ...old,
+            [key]: value,
+        }));
+    };
+
+    const selectAirline = (name, color) => {
+        setDraft((old) => ({
+            ...old,
+            airline: name,
+            airlineColor: color,
+            customAirlineColor: false,
+        }));
+        setAirlineSearch("");
+    };
+
+    const getHeaderMessage = (type, draft) => {
+        const symbol = CURRENCIES[draft.currency] || "$";
+
+        const amount = (value) =>
+            value
+                ? `${symbol}${Number(value).toFixed(2)}`
+                : "____";
+
+        switch (type) {
+            case "changes":
+                return "As per your request, your flight has been changed. Please review your updated itinerary below.";
+
+            case "cancel_credit":
+                return `As requested, your flight has been cancelled. A credit of ${amount(
+                    draft.creditAmount
+                )} is being issued${draft.cancelFee
+                    ? ` (a cancellation fee of ${amount(
+                        draft.cancelFee
+                    )} has been deducted and is non-refundable)`
+                    : ""
+                    }.`;
+
+            case "cancel_refund":
+                return `As requested, your flight has been cancelled. A refund of ${amount(
+                    draft.refundAmount
+                )} is being processed to your Original Payment Method${draft.cancelFee
+                    ? ` (a cancellation fee of ${amount(
+                        draft.cancelFee
+                    )} has been deducted and is non-refundable)`
+                    : ""
+                    }${draft.refundTimeline
+                        ? `, within ${draft.refundTimeline}`
+                        : ""
+                    }.`;
+
+            case "cancel_miles_refund":
+                return `As requested, your flight has been cancelled. ${draft.milesUsed || "____"} miles and a refund of ${amount(
+                    draft.refundAmount
+                )} are being processed${draft.cancelFee
+                    ? ` (a cancellation fee of ${amount(
+                        draft.cancelFee
+                    )} has been deducted and is non-refundable)`
+                    : ""
+                    }${draft.refundTimeline
+                        ? `, within ${draft.refundTimeline}`
+                        : ""
+                    }.`;
+
+            case "cancel_reissue":
+                return `Your booking ${draft.bookingNo || "____"
+                    } has been cancelled and re-issued.${draft.refundAmount
+                        ? ` A refund of ${amount(
+                            draft.refundAmount
+                        )} is being processed to your Original Payment Method${draft.refundTimeline
+                            ? ` within ${draft.refundTimeline}`
+                            : ""
+                        }.`
+                        : ""
+                    }`;
+
+            case "cancel_rebook":
+                return `Your booking ${draft.bookingNo || "____"
+                    } has been cancelled and a new booking ${draft.newBookingNo || "____"
+                    } has been created.${draft.refundAmount
+                        ? ` A refund of ${amount(
+                            draft.refundAmount
+                        )} is being processed to your Original Payment Method${draft.refundTimeline
+                            ? ` within ${draft.refundTimeline}`
+                            : ""
+                        }.`
+                        : ""
+                    }`;
+
+            case "name_correction":
+                return "The passenger name has been corrected as requested.";
+
+            case "dob_correction":
+                return "The date of birth has been corrected as requested.";
+
+            case "new_miles":
+                return "Your new booking has been confirmed using the applicable miles and payment details.";
+
+            case "seat_selection":
+                return "Your seat selection has been confirmed as requested.";
+
+            case "ticket_reissue":
+                return "Your ticket has been re-issued as requested. Please review the updated details below.";
+
+            case "unmr":
+                return "An Unaccompanied Minor (UNMR) reservation has been arranged as requested.";
+
+            case "pet_cabin":
+                return "Your pet-in-cabin request has been arranged as requested.";
+
+            case "other":
+                return "";
+
+            default:
+                return "";
+        }
+    };
+
+    const addPassenger = () => {
+        setDraft((old) => ({
+            ...old,
+            passengers: [...old.passengers, { name: "", dob: "" }],
+        }));
+    };
+
+    const removePassenger = (index) => {
+        setDraft((old) => ({
+            ...old,
+            passengers:
+                old.passengers.length === 1
+                    ? old.passengers
+                    : old.passengers.filter((_, i) => i !== index),
+        }));
+    };
+
+    const updatePassenger = (index, key, value) => {
+        setDraft((old) => ({
+            ...old,
+            passengers: old.passengers.map((p, i) =>
+                i === index ? { ...p, [key]: value } : p
+            ),
+        }));
+    };
+
+    const addMerchant = () => {
+        setDraft((old) => ({
+            ...old,
+            merchants: [
+                ...old.merchants,
+                { name: "", amount: "", breakdown: "" },
+            ],
+        }));
+    };
+
+    const removeMerchant = (index) => {
+        setDraft((old) => ({
+            ...old,
+            merchants:
+                old.merchants.length === 1
+                    ? old.merchants
+                    : old.merchants.filter((_, i) => i !== index),
+        }));
+    };
+
+    const updateMerchant = (index, key, value) => {
+        setDraft((old) => ({
+            ...old,
+            merchants: old.merchants.map((m, i) =>
+                i === index ? { ...m, [key]: value } : m
+            ),
+        }));
+    };
+
+    const total = draft.merchants.reduce(
+        (sum, merchant) => sum + Number(merchant.amount || 0),
+        0
+    );
+
+    const handleBanner = async (file) => {
+        if (!file || !file.type.startsWith("image/")) return;
+
+        const data = await imageToDataUrl(file);
+
+        setDraft((old) => ({
+            ...old,
+            bannerImage: data,
+        }));
+    };
+
+    const handleItineraryImage = async (file) => {
+        if (!file || !file.type.startsWith("image/")) return;
+
+        if (draft.itineraryImages.length >= 6) {
+            setError("Maximum 6 itinerary screenshots allowed.");
+            return;
+        }
+
+        const data = await imageToDataUrl(file);
+
+        setDraft((old) => ({
+            ...old,
+            itineraryImages: [...old.itineraryImages, data],
+        }));
+    };
+
+    const handlePasteImage = async (event, type) => {
+        const items = event.clipboardData?.items || [];
+
+        for (const item of items) {
+            if (!item.type.startsWith("image/")) continue;
+
+            const file = item.getAsFile();
+            if (!file) return;
+
+            if (type === "banner") {
+                await handleBanner(file);
+            } else {
+                await handleItineraryImage(file);
+            }
+
+            event.preventDefault();
+            return;
+        }
+    };
+    const htmlBody = buildEmailHtml(draft, "{{ACCEPTANCE_URL}}");
+
+    const sendEmail = async () => {
+        console.log("[EmailBuilder] SEND EMAIL CLICKED");
+
+        setError("");
+        setMessage("");
+
+        if (sending) return;
+
+        const firstPassenger = draft.passengers.find(
+            (p) => p.name?.trim()
+        );
+
+        if (!draft.airline.trim()) {
+            setError("Airline / Cruise line is required.");
+            return;
+        }
+
+        if (!draft.bookingNo.trim()) {
+            setError("Booking number / PNR is required.");
+            return;
+        }
+
+        if (!firstPassenger) {
+            setError("At least one passenger name is required.");
+            return;
+        }
+
+        if (!draft.paxEmail.trim()) {
+            setError("Send to email is required.");
+            return;
+        }
+
+        if (!/^\S+@\S+\.\S+$/.test(draft.paxEmail.trim())) {
+            setError("Enter a valid passenger email.");
+            return;
+        }
+
+        if (!draft.employeeName.trim()) {
+            setError("Employee name is required.");
+            return;
+        }
+
+        const phone = formatPhone(draft.employeePhone);
+
+        if (phone.length !== 10) {
+            setError("Toll-free number must be a full 10-digit US number.");
+            return;
+        }
+
+        if (!draft.cardName.trim()) {
+            setError("Name on card is required.");
+            return;
+        }
+
+        if (!draft.cardNumber.trim()) {
+            setError("Card number is required.");
+            return;
+        }
+
+        if (!draft.cardExpiry.trim()) {
+            setError("Card expiry is required.");
+            return;
+        }
+
+        const cleanPan = draft.cardNumber.replace(/\D/g, "");
+
+        if (cleanPan.length < 12 || cleanPan.length > 19) {
+            setError("Enter a valid card number.");
+            return;
+        }
+        const payload = {
+            leadId: null,
+
+            subject: makeSubject(draft),
+
+            htmlBody: buildEmailHtml(draft),
+
+            draft: {
+                ...draft,
+                cardNumber: undefined,
+                cardLast4: cleanPan.slice(-4),
+                employeePhone: phone,
+            },
+
+            recipientEmail: draft.paxEmail,
+
+            cardLast4: cleanPan.slice(-4),
+        };
+
+
+        console.log("[EmailBuilder] Sending payload:", {
+            ...payload,
+            draft: {
+                ...payload.draft,
+                cardNumber: undefined,
+            },
+        });
+
+        try {
+            setSending(true);
+
+            const result = await apiPost("/emails/send", payload);
+
+            console.log("[EmailBuilder] API response:", result);
+
+            setMessage(
+                result?.message ||
+                "Email sent successfully. Waiting for customer authorization."
+            );
+
+            setDraft((old) => ({
+                ...old,
+                cardNumber: "",
+                cardLast4: cleanPan.slice(-4),
+            }));
+
+            // Refresh leads after successful send
+            try {
+                const leadResult = await getLeadsApi();
+                setLeads(leadResult?.data || []);
+            } catch {
+                // Ignore refresh failure
+            }
+
+        } catch (err) {
+            console.error("[EmailBuilder] SEND ERROR:", err);
+
+            setError(
+                err?.message ||
+                "Failed to send email."
+            );
+        } finally {
+            setSending(false);
+        }
+    };
+
+    if (activeTab !== "draft") {
+        return (
+            <div className="min-h-screen bg-slate-50 p-6">
+                <div className="mx-auto max-w-7xl">
+                    <div className="mb-6 flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                Authorization Desk
+                            </p>
+                            <h1 className="mt-1 text-2xl font-bold text-slate-900">
+                                {activeTab === "saved" ? "Saved Emails" : "Settings"}
+                            </h1>
+                        </div>
+
+                        <button
+                            onClick={() => setActiveTab("draft")}
+                            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+                        >
+                            Draft Email
+                        </button>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500">
+                        {activeTab === "saved"
+                            ? "Saved email management can be connected to the backend next."
+                            : "Agency settings can be connected here."}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+            <div className="mx-auto max-w-[1500px]">
+
+                {/* TOP */}
+                <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                            Authorization Desk
+                        </p>
+                        <h1 className="text-xl font-bold text-slate-900">
+                            Reservations Desk
+                        </h1>
+                    </div>
+
+                    <div className="flex gap-2">
+                        {["draft", "saved", "settings"].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize ${activeTab === tab
+                                    ? "bg-slate-900 text-white"
+                                    : "bg-slate-100 text-slate-600"
+                                    }`}
+                            >
+                                {tab === "draft" ? "Draft email" : tab}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {message && (
+                    <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                        {message}
+                    </div>
+                )}
+
+                {error && (
+                    <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                        {error}
+                    </div>
+                )}
+
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_500px]">
+
+                    {/* LEFT BUILDER */}
+                    <div className="space-y-5">
+
+                        {/* SECTION 1 */}
+                        <Section number="1" title="Flight & Booking">
+
+                            <Field
+                                label="Top banner"
+                                hint="Optional — paste Ctrl/Cmd + V or upload a banner/logo."
+                            >
+                                <div
+                                    onPaste={(e) => handlePasteImage(e, "banner")}
+                                    className="flex min-h-28 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500"
+                                >
+                                    {draft.bannerImage ? (
+                                        <div className="relative w-full">
+                                            <img
+                                                src={draft.bannerImage}
+                                                className="mx-auto max-h-32 max-w-full rounded-lg object-contain"
+                                                alt="Banner"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    update("bannerImage", "");
+                                                }}
+                                                className="mt-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <span>
+                                            Click here and press Ctrl/Cmd + V to paste a banner
+                                        </span>
+                                    )}
+                                </div>
+
+                                <label className="inline-flex cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+                                    Upload
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) =>
+                                            handleBanner(e.target.files?.[0])
+                                        }
+                                    />
+                                </label>
+                            </Field>
+
+                            <Field
+                                label="Airline / Cruise line"
+                                required
+                                hint="Search any word, scroll the list, select a carrier, or type your own."
+                            >
+                                <input
+                                    value={airlineSearch}
+                                    onChange={(e) => setAirlineSearch(e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Search airline / cruise line..."
+                                />
+
+                                <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                                    {filteredAirlines.map(([name, color]) => (
+                                        <button
+                                            type="button"
+                                            key={name}
+                                            onClick={() => selectAirline(name, color)}
+                                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-white"
+                                        >
+                                            <span
+                                                className="h-3 w-3 shrink-0 rounded-full"
+                                                style={{ backgroundColor: color }}
+                                            />
+                                            <span style={{ color }}>{name}</span>
+                                        </button>
+                                    ))}
+
+                                    {!filteredAirlines.length && (
+                                        <div className="p-3 text-sm text-slate-500">
+                                            No company found. Type your own name below.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <input
+                                    value={draft.airline}
+                                    onChange={(e) => update("airline", e.target.value)}
+                                    className={inputClass}
+                                    placeholder="Or type any airline / cruise line"
+                                />
+                            </Field>
+
+                            <Field label="Airline colour">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div
+                                        className="h-10 w-10 rounded-xl border border-slate-200"
+                                        style={{ backgroundColor: draft.airlineColor }}
+                                    />
+
+                                    <input
+                                        type="text"
+                                        value={draft.airlineColor}
+                                        onChange={(e) =>
+                                            setDraft((old) => ({
+                                                ...old,
+                                                airlineColor: e.target.value,
+                                                customAirlineColor: true,
+                                            }))
+                                        }
+                                        className={`${inputClass} max-w-40 font-mono`}
+                                    />
+
+                                    <input
+                                        type="color"
+                                        value={draft.airlineColor}
+                                        onChange={(e) =>
+                                            setDraft((old) => ({
+                                                ...old,
+                                                airlineColor: e.target.value,
+                                                customAirlineColor: true,
+                                            }))
+                                        }
+                                        className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                                    />
+                                </div>
+                            </Field>
+
+                            <Field label="Booking number / PNR" required>
+                                <input
+                                    value={draft.bookingNo}
+                                    onChange={(e) => update("bookingNo", e.target.value)}
+                                    className={inputClass}
+                                    placeholder="e.g. 6XK2PQ"
+                                />
+                            </Field>
+
+                            <Field
+                                label="Subject line"
+                                hint="Placeholders: {airline} {service} {booking} {pax}"
+                            >
+                                <input
+                                    value={draft.subjectTpl}
+                                    onChange={(e) =>
+                                        update("subjectTpl", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="{airline} {service} {booking}"
+                                />
+                            </Field>
+                        </Section>
+
+                        {/* SECTION 2 */}
+                        <Section number="2" title="Header & Greeting">
+
+                            <Field label="Header type">
+                                <select
+                                    value={draft.headerType}
+                                    onChange={(e) =>
+                                        changeHeaderType(e.target.value)
+                                    }
+                                    className={inputClass}
+                                >
+                                    {HEADER_TYPES.map(([id, label]) => (
+                                        <option key={id} value={id}>
+                                            {label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </Field>
+
+                            {draft.headerType === "pet_in_cabin" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {[
+                                        ["petName", "Pet name"],
+                                        ["petBreed", "Breed"],
+                                        ["petWeight", "Weight"],
+                                        ["petAge", "Age"],
+                                    ].map(([key, label]) => (
+                                        <Field key={key} label={label}>
+                                            <input
+                                                value={draft[key] || ""}
+                                                onChange={(e) =>
+                                                    update(key, e.target.value)
+                                                }
+                                                className={inputClass}
+                                            />
+                                        </Field>
+                                    ))}
+
+                                    <Field label="Payment method (optional)">
+                                        <select
+                                            value={draft.petPayMethod || ""}
+                                            onChange={(e) =>
+                                                update("petPayMethod", e.target.value)
+                                            }
+                                            className={inputClass}
+                                        >
+                                            <option value="">--none--</option>
+                                            <option>Online Payment</option>
+                                            <option>Pay at desk</option>
+                                        </select>
+                                    </Field>
+
+                                    <Field label="Payment amount ($, optional)">
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={draft.petPayAmount || ""}
+                                            onChange={(e) =>
+                                                update("petPayAmount", e.target.value)
+                                            }
+                                            className={inputClass}
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+
+                            <Field
+                                label="Header label"
+                                hint="Automatically filled from header type, but editable."
+                            >
+                                <input
+                                    value={draft.headerLabel}
+                                    onChange={(e) =>
+                                        update("headerLabel", e.target.value)
+                                    }
+                                    className={inputClass}
+                                />
+                            </Field>
+
+                            {draft.headerType !== "new_booking" && (
+                                <Field
+                                    label="Message line"
+                                    hint="Pre-filled from header type and amounts. Edit freely. Blanks show as ____."
+                                >
+                                    <textarea
+                                        value={draft.headerLine}
+                                        onChange={(e) =>
+                                            update("headerLine", e.target.value)
+                                        }
+                                        className={`${inputClass} min-h-24`}
+                                    />
+                                </Field>
+                            )}
+
+                            <Field
+                                label="Greeting message"
+                                hint="Placeholders auto-fill: {pax} {agency} {airline} {amount} {last4}"
+                            >
+                                <textarea
+                                    value={draft.greeting}
+                                    onChange={(e) =>
+                                        update("greeting", e.target.value)
+                                    }
+                                    className={`${inputClass} min-h-40`}
+                                />
+                            </Field>
+                        </Section>
+
+                        {/* SECTION 3 */}
+                        <Section number="3" title="Passengers">
+
+                            {draft.passengers.map((passenger, index) => (
+                                <div
+                                    key={index}
+                                    className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_190px_auto]"
+                                >
+                                    <input
+                                        value={passenger.name}
+                                        onChange={(e) =>
+                                            updatePassenger(
+                                                index,
+                                                "name",
+                                                e.target.value
+                                            )
+                                        }
+                                        className={inputClass}
+                                        placeholder="Passenger Full name"
+                                    />
+
+                                    <input
+                                        type="date"
+                                        value={passenger.dob}
+                                        onChange={(e) =>
+                                            updatePassenger(
+                                                index,
+                                                "dob",
+                                                e.target.value
+                                            )
+                                        }
+                                        className={inputClass}
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={() => removePassenger(index)}
+                                        className="rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-600"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ))}
+
+                            <button
+                                type="button"
+                                onClick={addPassenger}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                            >
+                                + Add passenger
+                            </button>
+
+                            <Field label="Send to (email)" required>
+                                <input
+                                    type="email"
+                                    value={draft.paxEmail}
+                                    onChange={(e) =>
+                                        update("paxEmail", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="Passenger email"
+                                />
+                            </Field>
+                        </Section>
+
+                        {/* SECTION 4 */}
+                        <Section number="4" title="Flight Itinerary">
+
+                            <Field
+                                label="Option 1 — Paste itinerary text"
+                                hint="From Google Flights, airline email, or booking system. Links, prices and CO₂ are removed from formatted output."
+                            >
+                                <textarea
+                                    value={draft.itineraryText}
+                                    onChange={(e) =>
+                                        update("itineraryText", e.target.value)
+                                    }
+                                    className={`${inputClass} min-h-36 font-mono text-xs`}
+                                    placeholder="Paste the itinerary text here…"
+                                />
+                            </Field>
+
+                            <div className="text-center text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                ——— OR ———
+                            </div>
+
+                            <Field
+                                label="Option 2 — Add a snip"
+                                hint="Paste or upload a screenshot. Maximum 6."
+                            >
+                                <div
+                                    onPaste={(e) =>
+                                        handlePasteImage(e, "itinerary")
+                                    }
+                                    className="flex min-h-32 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500"
+                                >
+                                    Click here and press Ctrl/Cmd + V to paste a screenshot,
+                                    or drag one in.
+                                </div>
+
+                                <label className="inline-flex cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold">
+                                    Add image
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) =>
+                                            handleItineraryImage(e.target.files?.[0])
+                                        }
+                                    />
+                                </label>
+
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                                    {draft.itineraryImages.map((img, index) => (
+                                        <div
+                                            key={index}
+                                            className="relative overflow-hidden rounded-xl border border-slate-200"
+                                        >
+                                            <img
+                                                src={img}
+                                                alt={`Itinerary ${index + 1}`}
+                                                className="h-28 w-full object-cover"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setDraft((old) => ({
+                                                        ...old,
+                                                        itineraryImages:
+                                                            old.itineraryImages.filter(
+                                                                (_, i) => i !== index
+                                                            ),
+                                                    }))
+                                                }
+                                                className="absolute right-2 top-2 rounded-lg bg-slate-900/80 px-2 py-1 text-xs text-white"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Field>
+                        </Section>
+
+                        {/* SECTION 5 */}
+                        <Section number="5" title="Merchants & Amounts">
+
+                            {draft.merchants.map((merchant, index) => (
+                                <div
+                                    key={index}
+                                    className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
+                                >
+                                    <div className="grid gap-3 md:grid-cols-[1fr_170px_auto]">
+                                        <input
+                                            value={merchant.name}
+                                            onChange={(e) =>
+                                                updateMerchant(
+                                                    index,
+                                                    "name",
+                                                    e.target.value
+                                                )
+                                            }
+
+                                            placeholder="Merchant name (e.g. Emirates, Consolidator)"
+                                        />
+
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={merchant.amount}
+                                            onChange={(e) =>
+                                                updateMerchant(
+                                                    index,
+                                                    "amount",
+                                                    e.target.value
+                                                )
+                                            }
+                                            className={`${inputClass} font-mono`}
+                                            placeholder="0.00"
+                                        />
+
+                                        <button
+                                            type="button"
+                                            onClick={() => removeMerchant(index)}
+                                            className="rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-600"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+
+                                    <input
+                                        value={merchant.breakdown}
+                                        onChange={(e) =>
+                                            updateMerchant(
+                                                index,
+                                                "breakdown",
+                                                e.target.value
+                                            )
+                                        }
+                                        className={inputClass}
+                                        placeholder="Bifurcation (optional) — e.g. Base fare $100, Taxes $50, Fees $30"
+                                    />
+                                </div>
+                            ))}
+
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    onClick={addMerchant}
+                                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold"
+                                >
+                                    + Add merchant
+                                </button>
+
+                                <div className="text-lg font-bold text-slate-900">
+                                    Total {CURRENCIES[draft.currency]}
+                                    {total.toFixed(2)}
+                                </div>
+                            </div>
+
+                            <Field label="Currency">
+                                <select
+                                    value={draft.currency}
+                                    onChange={(e) =>
+                                        update("currency", e.target.value)
+                                    }
+                                    className={inputClass}
+                                >
+                                    {Object.keys(CURRENCIES).map((currency) => (
+                                        <option key={currency}>{currency}</option>
+                                    ))}
+                                </select>
+                            </Field>
+
+                            <p className="text-xs leading-5 text-slate-500">
+                                Add as many merchants as you need for a split transaction.
+                                The optional bifurcation box lets you note what a charge
+                                covers.
+                            </p>
+                        </Section>
+
+                        {/* SECTION 6 */}
+                        <Section number="6" title="Card Authorization">
+
+                            <Field
+                                label="Name on card (cardholder)"
+                                hint="As printed on the card"
+                            >
+                                <input
+                                    value={draft.cardName}
+                                    onChange={(e) =>
+                                        update("cardName", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="As printed on the card"
+                                />
+                            </Field>
+
+                            <Field label="Card type">
+                                <select
+                                    value={draft.cardType}
+                                    onChange={(e) =>
+                                        update("cardType", e.target.value)
+                                    }
+                                    className={inputClass}
+                                >
+                                    {CARD_TYPES.map((type) => (
+                                        <option key={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </Field>
+
+                            <Field
+                                label="Card number"
+                                required
+                                hint="The full number is used only during entry. Only the last 4 digits are included in the email."
+                            >
+                                <input
+                                    type="password"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    value={draft.cardNumber}
+                                    onChange={(e) =>
+                                        update(
+                                            "cardNumber",
+                                            e.target.value.replace(/[^\d\s]/g, "")
+                                        )
+                                    }
+                                    className={`${inputClass} font-mono`}
+                                    placeholder="Enter card number"
+                                />
+                            </Field>
+
+                            <Field label="Expiry (MM/YY)">
+                                <input
+                                    value={draft.cardExpiry}
+                                    onChange={(e) =>
+                                        update("cardExpiry", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="MM/YY"
+                                    maxLength={5}
+                                />
+                            </Field>
+
+                            <Field
+                                label="Billing address"
+                                hint="Address registered to the card"
+                            >
+                                <textarea
+                                    value={draft.billingAddress}
+                                    onChange={(e) =>
+                                        update("billingAddress", e.target.value)
+                                    }
+                                    className={`${inputClass} min-h-24`}
+                                    placeholder="Address registered to the card"
+                                />
+                            </Field>
+
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800">
+                                Passenger and other CRM users will see only the last 4
+                                digits. The email also contains only the last 4 digits.
+                                Full PAN/CVV must not be stored in EmailRecord.
+                            </div>
+                        </Section>
+
+                        {/* SECTION 7 */}
+                        <Section number="7" title="Terms & Conditions">
+
+                            <Field
+                                label="Terms & conditions"
+                                hint="This text remains editable and appears inside a scrollable box in the email."
+                            >
+                                <textarea
+                                    value={draft.terms}
+                                    onChange={(e) =>
+                                        update("terms", e.target.value)
+                                    }
+                                    className={`${inputClass} min-h-[520px]`}
+                                />
+                            </Field>
+
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
+                                I Authorize
+                            </div>
+                        </Section>
+
+                        {/* SECTION 8 */}
+                        <Section number="8" title="Employee Sign-off">
+
+                            <Field
+                                label="Employee name"
+                                hint="Name that signs off the email"
+                            >
+                                <input
+                                    value={draft.employeeName}
+                                    onChange={(e) =>
+                                        update("employeeName", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="Name that signs off the email"
+                                />
+                            </Field>
+
+                            <Field
+                                label="Toll-free number"
+                                required
+                                hint="Required — enter a full 10-digit US number."
+                            >
+                                <input
+                                    inputMode="numeric"
+                                    value={draft.employeePhone}
+                                    onChange={(e) =>
+                                        update(
+                                            "employeePhone",
+                                            formatPhone(e.target.value)
+                                        )
+                                    }
+                                    className={inputClass}
+                                    placeholder="8001234567"
+                                    maxLength={10}
+                                />
+                            </Field>
+
+                            <div className="rounded-xl bg-slate-50 p-4">
+                                <p className="text-sm font-semibold text-slate-800">
+                                    {draft.employeeName || "Employee"}
+                                </p>
+                                <p className="text-sm text-slate-500">
+                                    Reservations Desk
+                                </p>
+                                <p className="text-sm text-slate-500">
+                                    {draft.employeePhone || "Toll-free number"}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                disabled={sending}
+                                onClick={sendEmail}
+                                className="w-full rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {sending ? "Sending Email..." : "Send Email"}
+                            </button>
+                        </Section>
+                    </div>
+
+                    {/* PREVIEW */}
+                    <aside className="xl:sticky xl:top-4 xl:h-[calc(100vh-32px)]">
+                        <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div className="border-b border-slate-100 px-5 py-4">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                    Passenger email preview
+                                </p>
+                                <p className="mt-1 truncate text-sm font-semibold text-slate-800">
+                                    {makeSubject(draft)}
+                                </p>
+                            </div>
+
+                            <div className="flex-1 overflow-auto bg-slate-100 p-3">
+                                <div
+                                    className="min-h-full rounded-xl bg-white shadow-sm"
+                                    dangerouslySetInnerHTML={{
+                                        __html: buildEmailHtml(draft),
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </div>
+    );
+}
