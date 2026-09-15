@@ -5,25 +5,29 @@ import {
 } from "./client.js";
 
 const getLeadsApi = (params = {}) => {
-  const searchParams =
-    new URLSearchParams();
+  const searchParams = new URLSearchParams();
 
   if (params.status) {
-    searchParams.set(
-      "status",
-      params.status
-    );
+    searchParams.set("status", params.status);
   }
 
   if (params.search) {
-    searchParams.set(
-      "search",
-      params.search
-    );
+    searchParams.set("search", params.search);
   }
 
-  const query =
-    searchParams.toString();
+  if (params.clientName) {
+    searchParams.set("clientName", params.clientName);
+  }
+
+  if (params.page) {
+    searchParams.set("page", params.page);
+  }
+
+  if (params.limit) {
+    searchParams.set("limit", params.limit);
+  }
+
+  const query = searchParams.toString();
 
   return apiGet(
     `/leads${query ? `?${query}` : ""}`

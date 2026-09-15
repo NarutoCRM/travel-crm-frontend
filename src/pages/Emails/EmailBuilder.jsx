@@ -331,15 +331,11 @@ const makeSubject = (draft) =>
         draft.subjectTpl || "{airline} | {service} | {booking}",
         draft
     )
-        .replaceAll(
-            "{service}",
-            draft.headerLabel || "Booking"
-        )
+        .replaceAll("{service}", draft.headerLabel || "Booking")
         .replaceAll("{booking}", draft.bookingNo || "")
         .trim();
 
-const formatPhone = (value) =>
-    value.replace(/\D/g, "").slice(0, 10);
+const formatPhone = (value) => value.replace(/\D/g, "").slice(0, 10);
 
 const imageToDataUrl = (file) =>
     new Promise((resolve, reject) => {
@@ -350,6 +346,17 @@ const imageToDataUrl = (file) =>
 
         reader.readAsDataURL(file);
     });
+
+
+const formatCardExpiry = (value) => {
+    const digits = value.replace(/\D/g, "").slice(0, 4);
+
+    if (digits.length <= 2) {
+        return digits;
+    }
+
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+};
 
 const buildEmailHtml = (draft, acceptanceUrl = "#") => {
     const greeting = replacePlaceholders(draft.greeting, draft);
@@ -428,14 +435,25 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
 
   <div style="padding:24px 28px;border-bottom:1px solid #eee">
     <div
-  style="
+    style="
+
     background:${draft.airlineColor || "#16233D"};
+    display:flex;
+    justify-content:space-between;
     color:#ffffff;
     padding:28px 30px;
+    border-radius:15px 15px  0 0;
     font-family:Arial,Helvetica,sans-serif;
     bordaer
   "
->
+    >
+
+    <div style="
+    display:flex;
+    flex-direction:column;
+    gap:1px
+    "
+    >
   <div
     style="
       font-size:12px;
@@ -452,19 +470,25 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
   <div
     style="
       font-size:30px;
-      line-height:1.15;
+      line-height:1;
       font-weight:700;
       color:#ffffff;
     "
   >
     ${escapeHtml(draft.airline || "Airline")}
   </div>
+  </div>
 
+    <div style="
+    font-size:14px;
+    font-weight:700;
+    color:#ffffff;
+    opacity:.9;
+    ">
   ${draft.bookingNo
             ? `
         <div
           style="
-            margin-top:14px;
             font-size:11px;
             font-weight:700;
             letter-spacing:1px;
@@ -482,6 +506,7 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
             font-size:14px;
             font-weight:700;
             color:#ffffff;
+            text-align:right;
           "
         >
           ${escapeHtml(draft.bookingNo)}
@@ -489,6 +514,8 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
       `
             : ""
         }
+
+        </div>
 </div>
 
     <div style="font:700 14px Arial;color:#172033;margin-top:7px">
@@ -513,22 +540,37 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
             : ""
         }
 
-    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px">
-      Passengers
+    <h3 style="
+    font:700 14px Arial;
+    color:#172033;
+    border-bottom:2.5px solid #b67b2e;
+    padding-bottom:8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    ">
+      Passenger(s)
     </h3>
 
     <table width="100%" cellspacing="0">
       <thead>
-        <tr>
-          <th align="left" style="font:12px Arial;color:#777">Passenger</th>
-          <th align="right" style="font:12px Arial;color:#777">DOB</th>
+        <tr style="text-transform:uppercase">
+          <th align="left" style="font:12px Arial;color:#777">Name</th>
+          <th align="right" style="font:12px Arial;color:#777">Date of birth</th>
         </tr>
       </thead>
       <tbody>${passengers}</tbody>
     </table>
 
-    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
-      Flight Itinerary
+    <h3 style="
+    margin-top:12px;
+    font:700 14px Arial;
+    color:#172033;
+    border-bottom:2.5px solid #b67b2e;
+    padding-bottom:8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    ">
+      Your Trip
     </h3>
 
     <div style="border:1px solid #e5e7eb;border-radius:9px;padding:12px">
@@ -537,8 +579,16 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
 
     ${snips}
 
-    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
-      Charges
+    <h3 style="
+    margin-top:12px;
+    font:700 14px Arial;
+    color:#172033;
+    border-bottom:2.5px solid #b67b2e;
+    padding-bottom:8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    ">
+      Payment
     </h3>
 
     <table width="100%" cellspacing="0" style="border-collapse:collapse">
@@ -552,40 +602,221 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
       </tfoot>
     </table>
 
-    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
-      Card Authorization
-    </h3>
+    
 
-    <div style="font:13px Arial;line-height:1.8;color:#394150">
-      <b>Cardholder:</b> ${escapeHtml(draft.cardName || "____")}<br>
-      <b>Card Type:</b> ${escapeHtml(draft.cardType)}<br>
-      <b>Card:</b> •••• ${escapeHtml(draft.cardLast4 || "____")}<br>
-      <b>Expiry:</b> ${escapeHtml(draft.cardExpiry || "____")}<br>
-      <b>Billing Address:</b> ${escapeHtml(
-            draft.billingAddress || "____"
-        )}
+    
+
+    <h3 style="
+    margin-top:12px;
+    font:700 14px Arial;
+    color:#172033;
+    border-bottom:2.5px solid #b67b2e;
+    padding-bottom:8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+">
+    Card to be Charged
+</h3>
+
+<div style="
+    box-sizing:border-box;
+    width:100%;
+    padding:18px 22px 20px 22px;
+    background:#f7f8fb;
+    border:2px solid #e1e6ef;
+    border-radius:17px;
+    font-family:Arial, Helvetica, sans-serif;
+    color:#30394b;
+">
+
+    <!-- Cardholder -->
+    <div style="
+        margin-bottom:20px;
+    ">
+        <div style="
+            margin-bottom:7px;
+            font:700 10px Arial, Helvetica, sans-serif;
+            letter-spacing:1px;
+            color:#8b96ab;
+            text-transform:uppercase;
+        ">
+            Name on Card
+        </div>
+
+        <div style="
+            font:400 15px Arial, Helvetica, sans-serif;
+            line-height:1;
+            color:#30394b;
+        ">
+            ${escapeHtml(draft.cardName || "____")}
+        </div>
     </div>
 
-    <h3 style="font:700 14px Arial;color:#172033;border-bottom:1px solid #eee;padding-bottom:8px;margin-top:24px">
+
+    <!-- Card Details -->
+    <div style="
+        display:flex;
+        width:100%;
+        gap:40px;
+        margin-bottom:25px;
+    ">
+
+        <!-- Card Type -->
+        <div style="
+            flex:1;
+            min-width:0;
+        ">
+            <div style="
+                margin-bottom:7px;
+                font:700 10px Arial, Helvetica, sans-serif;
+                letter-spacing:1px;
+                color:#8b96ab;
+                text-transform:uppercase;
+            ">
+                Card Type
+            </div>
+
+            <div style="
+                font:400 15px Arial, Helvetica, sans-serif;
+                line-height:1.2;
+                color:#30394b;
+            ">
+                ${escapeHtml(draft.cardType || "____")}
+            </div>
+        </div>
+
+
+        <!-- Card Number -->
+        <div style="
+            flex:1;
+            min-width:0;
+        ">
+            <div style="
+                margin-bottom:7px;
+                font:700 10px Arial, Helvetica, sans-serif;
+                letter-spacing:1.4px;
+                color:#8b96ab;
+                text-transform:uppercase;
+            ">
+                Card Number
+            </div>
+
+            <div style="
+                font:400 15px Arial, Helvetica, sans-serif;
+                line-height:1.2;
+                color:#30394b;
+            ">
+            ${escapeHtml(draft.cardLast4 || "____")}
+            </div>
+        </div>
+
+
+        <!-- Expiry -->
+        <div style="
+            flex:1;
+            min-width:0;
+        ">
+            <div style="
+                margin-bottom:7px;
+                font:700 10px Arial, Helvetica, sans-serif;
+                letter-spacing:1.4px;
+                color:#8b96ab;
+                text-transform:uppercase;
+            ">
+                Expiry
+            </div>
+
+            <div style="
+                font:400 15px Arial, Helvetica, sans-serif;
+                line-height:1;
+                color:#30394b;
+            ">
+                ${escapeHtml(draft.cardExpiry || "____")}
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- Billing Address -->
+    <div>
+        <div style="
+            
+            font:700 10px Arial, Helvetica, sans-serif;
+            letter-spacing:1px;
+            color:#8b96ab;
+            text-transform:uppercase;
+        ">
+            Billing Address
+        </div>
+
+        <div style="
+            font:400 15px Arial, Helvetica, sans-serif;
+            line-height:1.2;
+            color:#30394b;
+        ">
+            ${escapeHtml(draft.billingAddress || "____")}
+        </div>
+    </div>
+
+</div>
+
+    <h3 style="
+    margin-top:12px;
+    font:700 14px Arial;
+    color:#172033;
+    border-bottom:2.5px solid #b67b2e;
+    padding-bottom:8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    ">
       Terms & Conditions
     </h3>
 
-    <div style="max-height:260px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:14px">
+    <div style="max-height:260px;
+    overflow:auto;
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:14px;
+    background-color:#F7F6F1
+    ">
       ${termsToEmailHtml(terms)}
     </div>
 
-    <div style="margin-top:22px;padding:18px;background:#f7f8fa;border-radius:10px">
-      <div style="font:700 13px Arial;color:#172033;margin-bottom:8px">
+    <div style="
+    margin-top:22px;
+    padding:18px;
+    background:#f7f8fa;
+    border-radius:10px;
+    background-color:#c4eed0;
+    ">
+    <div style="
+      color:#0f5223;
+      text-align:center;
+      font:700 13px Arial;
+      margin-bottom:8px
+      ">
         Authorization
       </div>
 
-      <div style="font:13px Arial;color:#4b5563;line-height:1.6">
+      <div style="font:13px Arial;
+      color:#4b5563;
+      line-height:1.6
+      ">
         By replying with “I Authorize” you confirm that you are the cardholder named above, that the details shown are correct, and that you authorize to charge your card for the services described.
       </div>
 
       <div style="text-align:center;margin-top:18px">
         <a href="${acceptanceUrl}"
-           style="display:inline-block;background:#172033;color:#fff;text-decoration:none;padding:12px 25px;border-radius:7px;font:700 13px Arial">
+           style="
+           display:inline-block;
+           background:${draft.airlineColor || "#16233D"};
+           color:#fff;
+           text-decoration:none;
+           padding:12px 25px;
+           border-radius:7px;
+           font:700 13px Arial
+           ">
           I Authorize
         </a>
       </div>
@@ -687,6 +918,7 @@ export default function EmailBuilder() {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [sending, setSending] = useState(false);
+    const [showCardNumber, setShowCardNumber] = useState(false);
 
     useEffect(() => {
         getLeadsApi()
@@ -699,20 +931,22 @@ export default function EmailBuilder() {
 
         if (!q) return AIRLINES;
 
-        return AIRLINES.filter(([name]) =>
-            name
-                .toLowerCase()
-                .split(/\s+/)
-                .some((word) => word.includes(q)) ||
-            name.toLowerCase().includes(q)
+        return AIRLINES.filter(
+            ([name]) =>
+                name
+                    .toLowerCase()
+                    .split(/\s+/)
+                    .some((word) => word.includes(q)) || name.toLowerCase().includes(q)
         );
     }, [airlineSearch]);
 
     const update = (key, value) => {
-        setDraft((old) => ({
-            ...old,
-            [key]: value,
-        }));
+        if (key === "cardExpiry") {
+            setDraft((old) => ({ ...old, [key]: value.replace(/\D/g, "").slice(0, 4) }));
+
+            return;
+        }
+        setDraft((old) => ({ ...old, [key]: value }));
     };
 
     const selectAirline = (name, color) => {
@@ -725,13 +959,27 @@ export default function EmailBuilder() {
         setAirlineSearch("");
     };
 
+    const formatCardNumber = (value) => {
+        return value.replace(/\D/g, "").slice(0, 16);
+    };
+    const formatUSPhone = (value) => {
+        const digits = value.replace(/\D/g, "").slice(0, 10);
+
+        if (digits.length <= 3) {
+            return digits.length ? `(${digits}` : "";
+        }
+
+        if (digits.length <= 6) {
+            return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+        }
+
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    };
     const getHeaderMessage = (type, draft) => {
         const symbol = CURRENCIES[draft.currency] || "$";
 
         const amount = (value) =>
-            value
-                ? `${symbol}${Number(value).toFixed(2)}`
-                : "____";
+            value ? `${symbol}${Number(value).toFixed(2)}` : "____";
 
         switch (type) {
             case "changes":
@@ -755,32 +1003,25 @@ export default function EmailBuilder() {
                         draft.cancelFee
                     )} has been deducted and is non-refundable)`
                     : ""
-                    }${draft.refundTimeline
-                        ? `, within ${draft.refundTimeline}`
-                        : ""
-                    }.`;
+                    }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
 
             case "cancel_miles_refund":
-                return `As requested, your flight has been cancelled. ${draft.milesUsed || "____"} miles and a refund of ${amount(
-                    draft.refundAmount
-                )} are being processed${draft.cancelFee
-                    ? ` (a cancellation fee of ${amount(
-                        draft.cancelFee
-                    )} has been deducted and is non-refundable)`
-                    : ""
-                    }${draft.refundTimeline
-                        ? `, within ${draft.refundTimeline}`
+                return `As requested, your flight has been cancelled. ${draft.milesUsed || "____"
+                    } miles and a refund of ${amount(
+                        draft.refundAmount
+                    )} are being processed${draft.cancelFee
+                        ? ` (a cancellation fee of ${amount(
+                            draft.cancelFee
+                        )} has been deducted and is non-refundable)`
                         : ""
-                    }.`;
+                    }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
 
             case "cancel_reissue":
                 return `Your booking ${draft.bookingNo || "____"
                     } has been cancelled and re-issued.${draft.refundAmount
                         ? ` A refund of ${amount(
                             draft.refundAmount
-                        )} is being processed to your Original Payment Method${draft.refundTimeline
-                            ? ` within ${draft.refundTimeline}`
-                            : ""
+                        )} is being processed to your Original Payment Method${draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
                         }.`
                         : ""
                     }`;
@@ -791,9 +1032,7 @@ export default function EmailBuilder() {
                     } has been created.${draft.refundAmount
                         ? ` A refund of ${amount(
                             draft.refundAmount
-                        )} is being processed to your Original Payment Method${draft.refundTimeline
-                            ? ` within ${draft.refundTimeline}`
-                            : ""
+                        )} is being processed to your Original Payment Method${draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
                         }.`
                         : ""
                     }`;
@@ -827,6 +1066,18 @@ export default function EmailBuilder() {
         }
     };
 
+    const changeHeaderType = (type) => {
+        const selected = HEADER_TYPES.find(([id]) => id === type);
+        const label = selected?.[1] || "New Booking";
+
+        setDraft((old) => ({
+            ...old,
+            headerType: type,
+            headerLabel: label,
+            headerLine: getHeaderMessage(type, old),
+        }));
+    };
+
     const addPassenger = () => {
         setDraft((old) => ({
             ...old,
@@ -856,10 +1107,7 @@ export default function EmailBuilder() {
     const addMerchant = () => {
         setDraft((old) => ({
             ...old,
-            merchants: [
-                ...old.merchants,
-                { name: "", amount: "", breakdown: "" },
-            ],
+            merchants: [...old.merchants, { name: "", amount: "", breakdown: "" }],
         }));
     };
 
@@ -943,9 +1191,7 @@ export default function EmailBuilder() {
 
         if (sending) return;
 
-        const firstPassenger = draft.passengers.find(
-            (p) => p.name?.trim()
-        );
+        const firstPassenger = draft.passengers.find((p) => p.name?.trim());
 
         if (!draft.airline.trim()) {
             setError("Airline / Cruise line is required.");
@@ -1010,7 +1256,7 @@ export default function EmailBuilder() {
 
             subject: makeSubject(draft),
 
-            htmlBody: buildEmailHtml(draft),
+            htmlBody: buildEmailHtml(draft, "{{ACCEPTANCE_URL}}"),
 
             draft: {
                 ...draft,
@@ -1023,7 +1269,6 @@ export default function EmailBuilder() {
 
             cardLast4: cleanPan.slice(-4),
         };
-
 
         console.log("[EmailBuilder] Sending payload:", {
             ...payload,
@@ -1058,14 +1303,10 @@ export default function EmailBuilder() {
             } catch {
                 // Ignore refresh failure
             }
-
         } catch (err) {
             console.error("[EmailBuilder] SEND ERROR:", err);
 
-            setError(
-                err?.message ||
-                "Failed to send email."
-            );
+            setError(err?.message || "Failed to send email.");
         } finally {
             setSending(false);
         }
@@ -1106,7 +1347,6 @@ export default function EmailBuilder() {
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-6">
             <div className="mx-auto max-w-[1500px]">
-
                 {/* TOP */}
                 <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
                     <div>
@@ -1147,13 +1387,10 @@ export default function EmailBuilder() {
                 )}
 
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_500px]">
-
                     {/* LEFT BUILDER */}
                     <div className="space-y-5">
-
                         {/* SECTION 1 */}
                         <Section number="1" title="Flight & Booking">
-
                             <Field
                                 label="Top banner"
                                 hint="Optional — paste Ctrl/Cmd + V or upload a banner/logo."
@@ -1193,9 +1430,7 @@ export default function EmailBuilder() {
                                         type="file"
                                         accept="image/*"
                                         className="hidden"
-                                        onChange={(e) =>
-                                            handleBanner(e.target.files?.[0])
-                                        }
+                                        onChange={(e) => handleBanner(e.target.files?.[0])}
                                     />
                                 </label>
                             </Field>
@@ -1293,9 +1528,7 @@ export default function EmailBuilder() {
                             >
                                 <input
                                     value={draft.subjectTpl}
-                                    onChange={(e) =>
-                                        update("subjectTpl", e.target.value)
-                                    }
+                                    onChange={(e) => update("subjectTpl", e.target.value)}
                                     className={inputClass}
                                     placeholder="{airline} {service} {booking}"
                                 />
@@ -1304,13 +1537,10 @@ export default function EmailBuilder() {
 
                         {/* SECTION 2 */}
                         <Section number="2" title="Header & Greeting">
-
                             <Field label="Header type">
                                 <select
                                     value={draft.headerType}
-                                    onChange={(e) =>
-                                        changeHeaderType(e.target.value)
-                                    }
+                                    onChange={(e) => changeHeaderType(e.target.value)}
                                     className={inputClass}
                                 >
                                     {HEADER_TYPES.map(([id, label]) => (
@@ -1332,9 +1562,7 @@ export default function EmailBuilder() {
                                         <Field key={key} label={label}>
                                             <input
                                                 value={draft[key] || ""}
-                                                onChange={(e) =>
-                                                    update(key, e.target.value)
-                                                }
+                                                onChange={(e) => update(key, e.target.value)}
                                                 className={inputClass}
                                             />
                                         </Field>
@@ -1343,9 +1571,7 @@ export default function EmailBuilder() {
                                     <Field label="Payment method (optional)">
                                         <select
                                             value={draft.petPayMethod || ""}
-                                            onChange={(e) =>
-                                                update("petPayMethod", e.target.value)
-                                            }
+                                            onChange={(e) => update("petPayMethod", e.target.value)}
                                             className={inputClass}
                                         >
                                             <option value="">--none--</option>
@@ -1359,9 +1585,7 @@ export default function EmailBuilder() {
                                             type="number"
                                             step="0.01"
                                             value={draft.petPayAmount || ""}
-                                            onChange={(e) =>
-                                                update("petPayAmount", e.target.value)
-                                            }
+                                            onChange={(e) => update("petPayAmount", e.target.value)}
                                             className={inputClass}
                                         />
                                     </Field>
@@ -1374,9 +1598,7 @@ export default function EmailBuilder() {
                             >
                                 <input
                                     value={draft.headerLabel}
-                                    onChange={(e) =>
-                                        update("headerLabel", e.target.value)
-                                    }
+                                    onChange={(e) => update("headerLabel", e.target.value)}
                                     className={inputClass}
                                 />
                             </Field>
@@ -1388,9 +1610,7 @@ export default function EmailBuilder() {
                                 >
                                     <textarea
                                         value={draft.headerLine}
-                                        onChange={(e) =>
-                                            update("headerLine", e.target.value)
-                                        }
+                                        onChange={(e) => update("headerLine", e.target.value)}
                                         className={`${inputClass} min-h-24`}
                                     />
                                 </Field>
@@ -1402,9 +1622,7 @@ export default function EmailBuilder() {
                             >
                                 <textarea
                                     value={draft.greeting}
-                                    onChange={(e) =>
-                                        update("greeting", e.target.value)
-                                    }
+                                    onChange={(e) => update("greeting", e.target.value)}
                                     className={`${inputClass} min-h-40`}
                                 />
                             </Field>
@@ -1412,7 +1630,6 @@ export default function EmailBuilder() {
 
                         {/* SECTION 3 */}
                         <Section number="3" title="Passengers">
-
                             {draft.passengers.map((passenger, index) => (
                                 <div
                                     key={index}
@@ -1421,11 +1638,7 @@ export default function EmailBuilder() {
                                     <input
                                         value={passenger.name}
                                         onChange={(e) =>
-                                            updatePassenger(
-                                                index,
-                                                "name",
-                                                e.target.value
-                                            )
+                                            updatePassenger(index, "name", e.target.value)
                                         }
                                         className={inputClass}
                                         placeholder="Passenger Full name"
@@ -1435,11 +1648,7 @@ export default function EmailBuilder() {
                                         type="date"
                                         value={passenger.dob}
                                         onChange={(e) =>
-                                            updatePassenger(
-                                                index,
-                                                "dob",
-                                                e.target.value
-                                            )
+                                            updatePassenger(index, "dob", e.target.value)
                                         }
                                         className={inputClass}
                                     />
@@ -1466,9 +1675,7 @@ export default function EmailBuilder() {
                                 <input
                                     type="email"
                                     value={draft.paxEmail}
-                                    onChange={(e) =>
-                                        update("paxEmail", e.target.value)
-                                    }
+                                    onChange={(e) => update("paxEmail", e.target.value)}
                                     className={inputClass}
                                     placeholder="Passenger email"
                                 />
@@ -1477,16 +1684,13 @@ export default function EmailBuilder() {
 
                         {/* SECTION 4 */}
                         <Section number="4" title="Flight Itinerary">
-
                             <Field
                                 label="Option 1 — Paste itinerary text"
                                 hint="From Google Flights, airline email, or booking system. Links, prices and CO₂ are removed from formatted output."
                             >
                                 <textarea
                                     value={draft.itineraryText}
-                                    onChange={(e) =>
-                                        update("itineraryText", e.target.value)
-                                    }
+                                    onChange={(e) => update("itineraryText", e.target.value)}
                                     className={`${inputClass} min-h-36 font-mono text-xs`}
                                     placeholder="Paste the itinerary text here…"
                                 />
@@ -1501,13 +1705,11 @@ export default function EmailBuilder() {
                                 hint="Paste or upload a screenshot. Maximum 6."
                             >
                                 <div
-                                    onPaste={(e) =>
-                                        handlePasteImage(e, "itinerary")
-                                    }
+                                    onPaste={(e) => handlePasteImage(e, "itinerary")}
                                     className="flex min-h-32 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500"
                                 >
-                                    Click here and press Ctrl/Cmd + V to paste a screenshot,
-                                    or drag one in.
+                                    Click here and press Ctrl/Cmd + V to paste a screenshot, or
+                                    drag one in.
                                 </div>
 
                                 <label className="inline-flex cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold">
@@ -1516,9 +1718,7 @@ export default function EmailBuilder() {
                                         type="file"
                                         accept="image/*"
                                         className="hidden"
-                                        onChange={(e) =>
-                                            handleItineraryImage(e.target.files?.[0])
-                                        }
+                                        onChange={(e) => handleItineraryImage(e.target.files?.[0])}
                                     />
                                 </label>
 
@@ -1538,10 +1738,9 @@ export default function EmailBuilder() {
                                                 onClick={() =>
                                                     setDraft((old) => ({
                                                         ...old,
-                                                        itineraryImages:
-                                                            old.itineraryImages.filter(
-                                                                (_, i) => i !== index
-                                                            ),
+                                                        itineraryImages: old.itineraryImages.filter(
+                                                            (_, i) => i !== index
+                                                        ),
                                                     }))
                                                 }
                                                 className="absolute right-2 top-2 rounded-lg bg-slate-900/80 px-2 py-1 text-xs text-white"
@@ -1556,7 +1755,6 @@ export default function EmailBuilder() {
 
                         {/* SECTION 5 */}
                         <Section number="5" title="Merchants & Amounts">
-
                             {draft.merchants.map((merchant, index) => (
                                 <div
                                     key={index}
@@ -1566,13 +1764,8 @@ export default function EmailBuilder() {
                                         <input
                                             value={merchant.name}
                                             onChange={(e) =>
-                                                updateMerchant(
-                                                    index,
-                                                    "name",
-                                                    e.target.value
-                                                )
+                                                updateMerchant(index, "name", e.target.value)
                                             }
-
                                             placeholder="Merchant name (e.g. Emirates, Consolidator)"
                                         />
 
@@ -1582,11 +1775,7 @@ export default function EmailBuilder() {
                                             step="0.01"
                                             value={merchant.amount}
                                             onChange={(e) =>
-                                                updateMerchant(
-                                                    index,
-                                                    "amount",
-                                                    e.target.value
-                                                )
+                                                updateMerchant(index, "amount", e.target.value)
                                             }
                                             className={`${inputClass} font-mono`}
                                             placeholder="0.00"
@@ -1604,11 +1793,7 @@ export default function EmailBuilder() {
                                     <input
                                         value={merchant.breakdown}
                                         onChange={(e) =>
-                                            updateMerchant(
-                                                index,
-                                                "breakdown",
-                                                e.target.value
-                                            )
+                                            updateMerchant(index, "breakdown", e.target.value)
                                         }
                                         className={inputClass}
                                         placeholder="Bifurcation (optional) — e.g. Base fare $100, Taxes $50, Fees $30"
@@ -1634,9 +1819,7 @@ export default function EmailBuilder() {
                             <Field label="Currency">
                                 <select
                                     value={draft.currency}
-                                    onChange={(e) =>
-                                        update("currency", e.target.value)
-                                    }
+                                    onChange={(e) => update("currency", e.target.value)}
                                     className={inputClass}
                                 >
                                     {Object.keys(CURRENCIES).map((currency) => (
@@ -1646,24 +1829,20 @@ export default function EmailBuilder() {
                             </Field>
 
                             <p className="text-xs leading-5 text-slate-500">
-                                Add as many merchants as you need for a split transaction.
-                                The optional bifurcation box lets you note what a charge
-                                covers.
+                                Add as many merchants as you need for a split transaction. The
+                                optional bifurcation box lets you note what a charge covers.
                             </p>
                         </Section>
 
                         {/* SECTION 6 */}
                         <Section number="6" title="Card Authorization">
-
                             <Field
                                 label="Name on card (cardholder)"
                                 hint="As printed on the card"
                             >
                                 <input
                                     value={draft.cardName}
-                                    onChange={(e) =>
-                                        update("cardName", e.target.value)
-                                    }
+                                    onChange={(e) => update("cardName", e.target.value)}
                                     className={inputClass}
                                     placeholder="As printed on the card"
                                 />
@@ -1672,9 +1851,7 @@ export default function EmailBuilder() {
                             <Field label="Card type">
                                 <select
                                     value={draft.cardType}
-                                    onChange={(e) =>
-                                        update("cardType", e.target.value)
-                                    }
+                                    onChange={(e) => update("cardType", e.target.value)}
                                     className={inputClass}
                                 >
                                     {CARD_TYPES.map((type) => (
@@ -1688,31 +1865,49 @@ export default function EmailBuilder() {
                                 required
                                 hint="The full number is used only during entry. Only the last 4 digits are included in the email."
                             >
-                                <input
-                                    type="password"
-                                    inputMode="numeric"
-                                    autoComplete="off"
-                                    value={draft.cardNumber}
-                                    onChange={(e) =>
-                                        update(
-                                            "cardNumber",
-                                            e.target.value.replace(/[^\d\s]/g, "")
-                                        )
-                                    }
-                                    className={`${inputClass} font-mono`}
-                                    placeholder="Enter card number"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showCardNumber ? "text" : "password"}
+                                        inputMode="numeric"
+                                        autoComplete="off"
+                                        maxLength={16}
+                                        placeholder="16-digit card number"
+                                        value={draft.cardNumber || ""}
+                                        onChange={(e) => {
+                                            const value = formatCardNumber(e.target.value);
+
+                                            setDraft((old) => ({
+                                                ...old,
+                                                cardNumber: value,
+                                                cardLast4: value.slice(-4),
+                                            }));
+                                        }}
+                                        className="w-full pr-20"
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCardNumber((prev) => !prev)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                                    >
+                                        {showCardNumber ? "Hide" : "Show"}
+                                    </button>
+                                </div>
                             </Field>
 
                             <Field label="Expiry (MM/YY)">
                                 <input
-                                    value={draft.cardExpiry}
-                                    onChange={(e) =>
-                                        update("cardExpiry", e.target.value)
-                                    }
-                                    className={inputClass}
+                                    type="text"
+                                    inputMode="numeric"
                                     placeholder="MM/YY"
                                     maxLength={5}
+                                    value={draft.cardExpiry || ""}
+                                    onChange={(e) =>
+                                        setDraft((old) => ({
+                                            ...old,
+                                            cardExpiry: formatCardExpiry(e.target.value),
+                                        }))
+                                    }
                                 />
                             </Field>
 
@@ -1722,33 +1917,28 @@ export default function EmailBuilder() {
                             >
                                 <textarea
                                     value={draft.billingAddress}
-                                    onChange={(e) =>
-                                        update("billingAddress", e.target.value)
-                                    }
+                                    onChange={(e) => update("billingAddress", e.target.value)}
                                     className={`${inputClass} min-h-24`}
                                     placeholder="Address registered to the card"
                                 />
                             </Field>
 
                             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800">
-                                Passenger and other CRM users will see only the last 4
-                                digits. The email also contains only the last 4 digits.
-                                Full PAN/CVV must not be stored in EmailRecord.
+                                Passenger and other CRM users will see only the last 4 digits.
+                                The email also contains only the last 4 digits. Full PAN/CVV
+                                must not be stored in EmailRecord.
                             </div>
                         </Section>
 
                         {/* SECTION 7 */}
                         <Section number="7" title="Terms & Conditions">
-
                             <Field
                                 label="Terms & conditions"
                                 hint="This text remains editable and appears inside a scrollable box in the email."
                             >
                                 <textarea
                                     value={draft.terms}
-                                    onChange={(e) =>
-                                        update("terms", e.target.value)
-                                    }
+                                    onChange={(e) => update("terms", e.target.value)}
                                     className={`${inputClass} min-h-[520px]`}
                                 />
                             </Field>
@@ -1760,16 +1950,10 @@ export default function EmailBuilder() {
 
                         {/* SECTION 8 */}
                         <Section number="8" title="Employee Sign-off">
-
-                            <Field
-                                label="Employee name"
-                                hint="Name that signs off the email"
-                            >
+                            <Field label="Employee name" hint="Name that signs off the email">
                                 <input
                                     value={draft.employeeName}
-                                    onChange={(e) =>
-                                        update("employeeName", e.target.value)
-                                    }
+                                    onChange={(e) => update("employeeName", e.target.value)}
                                     className={inputClass}
                                     placeholder="Name that signs off the email"
                                 />
@@ -1781,17 +1965,17 @@ export default function EmailBuilder() {
                                 hint="Required — enter a full 10-digit US number."
                             >
                                 <input
+                                    type="tel"
                                     inputMode="numeric"
-                                    value={draft.employeePhone}
+                                    placeholder="(800) 555-1234"
+                                    maxLength={14}
+                                    value={draft.employeePhone || ""}
                                     onChange={(e) =>
-                                        update(
-                                            "employeePhone",
-                                            formatPhone(e.target.value)
-                                        )
+                                        setDraft((old) => ({
+                                            ...old,
+                                            employeePhone: formatUSPhone(e.target.value),
+                                        }))
                                     }
-                                    className={inputClass}
-                                    placeholder="8001234567"
-                                    maxLength={10}
                                 />
                             </Field>
 
@@ -1799,9 +1983,7 @@ export default function EmailBuilder() {
                                 <p className="text-sm font-semibold text-slate-800">
                                     {draft.employeeName || "Employee"}
                                 </p>
-                                <p className="text-sm text-slate-500">
-                                    Reservations Desk
-                                </p>
+                                <p className="text-sm text-slate-500">Reservations Desk</p>
                                 <p className="text-sm text-slate-500">
                                     {draft.employeePhone || "Toll-free number"}
                                 </p>
@@ -1823,7 +2005,7 @@ export default function EmailBuilder() {
                         <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 px-5 py-4">
                                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                                    Passenger email preview
+                                    Passenger email preview ggg
                                 </p>
                                 <p className="mt-1 truncate text-sm font-semibold text-slate-800">
                                     {makeSubject(draft)}

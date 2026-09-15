@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
 import {
-  createLeadApi,
   getLeadsApi,
+  getLeadApi,
   updateLeadApi,
   updateLeadStatusApi
 } from "../../api/lead.api.js";
-import { getStoredUser } from "../../utils/auth.js";
 
 const STATUS_OPTIONS = [
   { value: "NEW", label: "New" },
@@ -15,15 +15,7 @@ const STATUS_OPTIONS = [
   { value: "CLOSED", label: "Closed" }
 ];
 
-const emptyForm = {
-  clientName: "",
-  clientEmail: "",
-  clientPhone: "",
-  destination: "",
-  travelDate: "",
-  travelRequirement: "",
-  notes: ""
-};
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100];
 
 const statusClass = {
   NEW: "bg-slate-100 text-slate-700",
@@ -34,140 +26,235 @@ const statusClass = {
 };
 
 const statusLabel = (status) => {
-  const item = STATUS_OPTIONS.find((x) => x.value === status);
-  return item?.label || status;
+  const item = STATUS_OPTIONS.find(
+    (x) => x.value === status
+  );
+
+  return item?.label || status || "-";
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleString();
+};
+
+const formatDate = (value) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleDateString();
 };
 
 const Leads = () => {
-  const user = getStoredUser();
-
   const [leads, setLeads] = useState([]);
-  const [form, setForm] = useState(emptyForm);
-
-  const [editingLead, setEditingLead] = useState(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false
+  });
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const [selectedLead, setSelectedLead] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const [editingLead, setEditingLead] = useState(null);
+  const [editForm, setEditForm] = useState({
+    clientName: "",
+    clientEmail: "",
+    clientPhone: "",
+    destination: "",
+    travelDate: "",
+    travelRequirement: "",
+    notes: ""
+  });
 
-  const loadLeads = async () => {
+  const loadLeads = async ({
+    targetPage = page,
+    targetLimit = limit,
+    targetSearch = search,
+    targetStatus = statusFilter,
+    targetClient = clientFilter
+  } = {}) => {
     try {
       setLoading(true);
       setError("");
 
       const response = await getLeadsApi({
-        search: search.trim(),
-        status: statusFilter
+        page: targetPage,
+        limit: targetLimit,
+        search: targetSearch.trim(),
+        status: targetStatus,
+        clientName: targetClient.trim()
       });
 
-      setLeads(response?.data || []);
+      console.log("LEADS API RESPONSE:", response);
+
+      const result = response?.data;
+
+      const leadData = Array.isArray(result)
+        ? result
+        : Array.isArray(result?.data)
+          ? result.data
+          : [];
+
+      const paginationData =
+        result?.pagination || {
+          page: targetPage,
+          limit: targetLimit,
+          total: leadData.length,
+          totalPages:
+            leadData.length > 0 ? 1 : 0,
+          hasNextPage: false,
+          hasPreviousPage: false
+        };
+
+      setLeads(leadData);
+      setPagination(paginationData);
+
     } catch (err) {
       console.error("Load leads error:", err);
-      setError(err.message || "Failed to load leads");
+
+      setError(
+        err?.message || "Failed to load leads"
+      );
+
+      setLeads([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadLeads();
-  }, [statusFilter]);
+    loadLeads({
+      targetPage: page,
+      targetLimit: limit
+    });
+  }, [page, limit, statusFilter]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    await loadLeads();
+
+    setPage(1);
+
+    await loadLeads({
+      targetPage: 1,
+      targetLimit: limit,
+      targetSearch: search,
+      targetStatus: statusFilter,
+      targetClient: clientFilter
+    });
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleClientFilter = async (e) => {
+    const value = e.target.value;
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: value
-    }));
+    setClientFilter(value);
+    setPage(1);
+
+    await loadLeads({
+      targetPage: 1,
+      targetLimit: limit,
+      targetSearch: search,
+      targetStatus: statusFilter,
+      targetClient: value
+    });
   };
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingLead(null);
+  const clearFilters = async () => {
+    setSearch("");
+    setStatusFilter("");
+    setClientFilter("");
+    setPage(1);
+
+    await loadLeads({
+      targetPage: 1,
+      targetLimit: limit,
+      targetSearch: "",
+      targetStatus: "",
+      targetClient: ""
+    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleLimitChange = (e) => {
+    const newLimit = Number(e.target.value);
 
-    setError("");
-    setSuccess("");
+    setLimit(newLimit);
+    setPage(1);
+  };
 
-    if (!form.clientName.trim()) {
-      setError("Client name is required");
+  const handlePageChange = (newPage) => {
+    if (newPage < 1) return;
+
+    if (
+      pagination.totalPages &&
+      newPage > pagination.totalPages
+    ) {
       return;
     }
 
-    if (!form.clientEmail.trim()) {
-      setError("Client email is required");
-      return;
-    }
+    setPage(newPage);
+  };
 
+  const handleView = async (lead) => {
     try {
-      setSaving(true);
+      setDetailsLoading(true);
+      setError("");
 
-      if (editingLead) {
-        await updateLeadApi(editingLead.id, {
-          clientName: form.clientName.trim(),
-          clientEmail: form.clientEmail.trim(),
-          clientPhone: form.clientPhone.trim(),
-          destination: form.destination.trim(),
-          travelDate: form.travelDate || null,
-          travelRequirement: form.travelRequirement.trim(),
-          notes: form.notes.trim()
-        });
+      const response = await getLeadApi(lead.id);
 
-        setSuccess("Lead updated successfully");
-      } else {
-        await createLeadApi({
-          clientName: form.clientName.trim(),
-          clientEmail: form.clientEmail.trim(),
-          clientPhone: form.clientPhone.trim(),
-          destination: form.destination.trim(),
-          travelDate: form.travelDate || null,
-          travelRequirement: form.travelRequirement.trim(),
-          notes: form.notes.trim()
-        });
-
-        setSuccess("Lead created successfully");
-      }
-
-      resetForm();
-      await loadLeads();
+      setSelectedLead(response?.data || lead);
     } catch (err) {
-      console.error("Lead save error:", err);
-      setError(err.message || "Failed to save lead");
+      console.error("Get lead error:", err);
+
+      setError(
+        err?.message || "Failed to load lead details"
+      );
     } finally {
-      setSaving(false);
+      setDetailsLoading(false);
     }
   };
 
-  const handleEdit = (lead) => {
+  const startEdit = (lead) => {
     setEditingLead(lead);
 
-    setForm({
+    setEditForm({
       clientName: lead.clientName || "",
       clientEmail: lead.clientEmail || "",
       clientPhone: lead.clientPhone || "",
       destination: lead.destination || "",
       travelDate: lead.travelDate
-        ? new Date(lead.travelDate).toISOString().split("T")[0]
+        ? new Date(lead.travelDate)
+          .toISOString()
+          .split("T")[0]
         : "",
-      travelRequirement: lead.travelRequirement || "",
+      travelRequirement:
+        lead.travelRequirement || "",
       notes: lead.notes || ""
     });
 
@@ -177,32 +264,198 @@ const Leads = () => {
     });
   };
 
-  const handleStatusChange = async (leadId, status) => {
+  const cancelEdit = () => {
+    setEditingLead(null);
+
+    setEditForm({
+      clientName: "",
+      clientEmail: "",
+      clientPhone: "",
+      destination: "",
+      travelDate: "",
+      travelRequirement: "",
+      notes: ""
+    });
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+
     try {
       setError("");
       setSuccess("");
 
-      await updateLeadStatusApi(leadId, status);
+      if (!editForm.clientName.trim()) {
+        setError("Client name is required");
+        return;
+      }
 
-      setSuccess("Lead status updated successfully");
+      if (!editForm.clientEmail.trim()) {
+        setError("Client email is required");
+        return;
+      }
+
+      await updateLeadApi(editingLead.id, {
+        clientName: editForm.clientName.trim(),
+        clientEmail: editForm.clientEmail.trim(),
+        clientPhone: editForm.clientPhone.trim(),
+        destination: editForm.destination.trim(),
+        travelDate: editForm.travelDate || null,
+        travelRequirement:
+          editForm.travelRequirement.trim(),
+        notes: editForm.notes.trim()
+      });
+
+      setSuccess("Lead updated successfully");
+
+      cancelEdit();
+
+      await loadLeads();
+    } catch (err) {
+      console.error("Update lead error:", err);
+
+      setError(
+        err?.message || "Failed to update lead"
+      );
+    }
+  };
+
+  const handleStatusChange = async (
+    leadId,
+    status
+  ) => {
+    try {
+      setError("");
+      setSuccess("");
+
+      await updateLeadStatusApi(
+        leadId,
+        status
+      );
+
+      setSuccess(
+        "Lead status updated successfully"
+      );
 
       await loadLeads();
 
       if (selectedLead?.id === leadId) {
-        setSelectedLead((prev) => ({
-          ...prev,
-          status
-        }));
+        const response = await getLeadApi(leadId);
+
+        setSelectedLead(
+          response?.data || {
+            ...selectedLead,
+            status
+          }
+        );
       }
     } catch (err) {
-      console.error("Status update error:", err);
-      setError(err.message || "Failed to update lead status");
+      console.error(
+        "Status update error:",
+        err
+      );
+
+      setError(
+        err?.message ||
+        "Failed to update lead status"
+      );
     }
   };
 
-  const visibleLeads = useMemo(() => {
-    return leads;
-  }, [leads]);
+  const getEmailSentAt = (lead) => {
+    if (!lead?.emails?.length) {
+      return null;
+    }
+
+    return lead.emails
+      .map((email) => email.sentAt)
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b) - new Date(a)
+      )[0];
+  };
+
+  const getAcceptedEmail = (lead) => {
+    if (!lead?.emails?.length) {
+      return null;
+    }
+
+    return (
+      lead.emails.find(
+        (email) =>
+          email.acceptedAt ||
+          email.acceptance?.acceptedAt
+      ) || null
+    );
+  };
+
+  const acceptedEmail =
+    getAcceptedEmail(selectedLead);
+
+  const acceptedAt =
+    acceptedEmail?.acceptedAt ||
+    acceptedEmail?.acceptance?.acceptedAt ||
+    null;
+
+  const customerIp =
+    acceptedEmail?.acceptance?.ipAddress ||
+    null;
+
+  const customerUserAgent =
+    acceptedEmail?.acceptance?.userAgent ||
+    null;
+
+  const emailSentAt =
+    getEmailSentAt(selectedLead);
+
+  const totalPages =
+    pagination.totalPages || 0;
+
+  const showingFrom =
+    pagination.total > 0
+      ? (pagination.page - 1) *
+      pagination.limit +
+      1
+      : 0;
+
+  const showingTo =
+    pagination.total > 0
+      ? Math.min(
+        pagination.page *
+        pagination.limit,
+        pagination.total
+      )
+      : 0;
+
+  const pageNumbers = [];
+
+  for (
+    let i = 1;
+    i <= totalPages;
+    i++
+  ) {
+    if (
+      i === 1 ||
+      i === totalPages ||
+      Math.abs(i - page) <= 2
+    ) {
+      pageNumbers.push(i);
+    }
+  }
+
+  const uniquePageNumbers = [
+    ...new Set(pageNumbers)
+  ];
 
   return (
     <div className="min-h-full bg-slate-100 p-4 sm:p-6 lg:p-8">
@@ -220,13 +473,13 @@ const Leads = () => {
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              Manage clients, travel requirements and lead status.
+              View and manage all authorized leads.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={loadLeads}
+            onClick={() => loadLeads()}
             className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             Refresh
@@ -246,210 +499,210 @@ const Leads = () => {
           </div>
         )}
 
-        {/* Create/Edit Lead */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-base font-semibold text-slate-900">
-              {editingLead ? "Edit Lead" : "Create Lead"}
-            </h2>
+        {/* Edit Lead */}
+        {editingLead && (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h2 className="text-base font-semibold text-slate-900">
+                Edit Lead
+              </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {editingLead
-                ? "Update client and travel information."
-                : "Add a new client lead to the CRM."}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-5">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-              {/* Client Name */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Client Name
-                </label>
-
-                <input
-                  type="text"
-                  name="clientName"
-                  value={form.clientName}
-                  onChange={handleChange}
-                  placeholder="Enter client name"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Client Email
-                </label>
-
-                <input
-                  type="email"
-                  name="clientEmail"
-                  value={form.clientEmail}
-                  onChange={handleChange}
-                  placeholder="client@example.com"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Phone
-                </label>
-
-                <input
-                  type="text"
-                  name="clientPhone"
-                  value={form.clientPhone}
-                  onChange={handleChange}
-                  placeholder="+91 9876543210"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              {/* Destination */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Destination
-                </label>
-
-                <input
-                  type="text"
-                  name="destination"
-                  value={form.destination}
-                  onChange={handleChange}
-                  placeholder="Las Vegas, USA"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              {/* Travel Date */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Travel Date
-                </label>
-
-                <input
-                  type="date"
-                  name="travelDate"
-                  value={form.travelDate}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              {/* Requirement */}
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Travel Requirement
-                </label>
-
-                <input
-                  type="text"
-                  name="travelRequirement"
-                  value={form.travelRequirement}
-                  onChange={handleChange}
-                  placeholder="Flights + Hotel"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Notes
-                </label>
-
-                <textarea
-                  name="notes"
-                  value={form.notes}
-                  onChange={handleChange}
-                  rows={4}
-                  placeholder="Additional client requirements..."
-                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                Update client and travel information.
+              </p>
             </div>
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-              {editingLead && (
+            <form
+              onSubmit={saveEdit}
+              className="p-5"
+            >
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+                <EditInput
+                  label="Client Name"
+                  name="clientName"
+                  value={editForm.clientName}
+                  onChange={handleEditChange}
+                />
+
+                <EditInput
+                  label="Client Email"
+                  name="clientEmail"
+                  type="email"
+                  value={editForm.clientEmail}
+                  onChange={handleEditChange}
+                />
+
+                <EditInput
+                  label="Phone"
+                  name="clientPhone"
+                  value={editForm.clientPhone}
+                  onChange={handleEditChange}
+                />
+
+                <EditInput
+                  label="Destination"
+                  name="destination"
+                  value={editForm.destination}
+                  onChange={handleEditChange}
+                />
+
+                <EditInput
+                  label="Travel Date"
+                  name="travelDate"
+                  type="date"
+                  value={editForm.travelDate}
+                  onChange={handleEditChange}
+                />
+
+                <EditInput
+                  label="Travel Requirement"
+                  name="travelRequirement"
+                  value={
+                    editForm.travelRequirement
+                  }
+                  onChange={handleEditChange}
+                />
+
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Notes
+                  </label>
+
+                  <textarea
+                    name="notes"
+                    value={editForm.notes}
+                    onChange={handleEditChange}
+                    rows={4}
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={resetForm}
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  onClick={cancelEdit}
+                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
-              )}
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving
-                  ? "Saving..."
-                  : editingLead
-                    ? "Update Lead"
-                    : "Create Lead"}
-              </button>
-            </div>
-          </form>
-        </div>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Update Lead
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Search & Filters */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <form
             onSubmit={handleSearch}
-            className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px_auto]"
+            className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_200px_220px_auto_auto]"
           >
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by client, email, lead code or destination..."
-              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Search client, email, lead code or destination..."
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
             />
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
             >
-              <option value="">All Status</option>
+              <option value="">
+                All Status
+              </option>
 
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
+              {STATUS_OPTIONS.map(
+                (status) => (
+                  <option
+                    key={status.value}
+                    value={status.value}
+                  >
+                    {status.label}
+                  </option>
+                )
+              )}
             </select>
+
+            <input
+              type="text"
+              value={clientFilter}
+              onChange={handleClientFilter}
+              placeholder="Filter by client name"
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            />
 
             <button
               type="submit"
-              className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
             >
               Search
+            </button>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Clear
             </button>
           </form>
         </div>
 
         {/* Lead List */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+
+          {/* List Header */}
+          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
                 Lead List
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                {visibleLeads.length} lead
-                {visibleLeads.length !== 1 ? "s" : ""} found
+                {pagination.total || 0} total lead
+                {pagination.total !== 1
+                  ? "s"
+                  : ""}
               </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-500">
+                Leads per page
+              </span>
+
+              <select
+                value={limit}
+                onChange={handleLimitChange}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-500"
+              >
+                {PAGE_SIZE_OPTIONS.map(
+                  (size) => (
+                    <option
+                      key={size}
+                      value={size}
+                    >
+                      {size}
+                    </option>
+                  )
+                )}
+              </select>
             </div>
           </div>
 
@@ -457,158 +710,266 @@ const Leads = () => {
             <div className="px-5 py-12 text-center text-sm text-slate-500">
               Loading leads...
             </div>
-          ) : visibleLeads.length === 0 ? (
+          ) : leads.length === 0 ? (
             <div className="px-5 py-12 text-center">
               <p className="text-sm font-medium text-slate-700">
                 No leads found
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
-                Create a lead or change your search/filter.
+                Try another search or filter.
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[1000px] w-full">
-                <thead className="bg-slate-50">
-                  <tr className="border-b border-slate-200">
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Lead
-                    </th>
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-[1200px] w-full">
+                  <thead className="bg-slate-50">
+                    <tr className="border-b border-slate-200">
 
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Client
-                    </th>
-
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Destination
-                    </th>
-
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Travel Date
-                    </th>
-
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Status
-                    </th>
-
-                    {isSuperAdmin && (
                       <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Created By
+                        Lead
                       </th>
-                    )}
 
-                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Client
+                      </th>
 
-                <tbody>
-                  {visibleLeads.map((lead) => (
-                    <tr
-                      key={lead.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900">
-                          {lead.leadCode}
-                        </div>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Destination
+                      </th>
 
-                        <div className="mt-1 text-xs text-slate-400">
-                          {lead.createdAt
-                            ? new Date(lead.createdAt).toLocaleDateString()
-                            : "-"}
-                        </div>
-                      </td>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Travel Date
+                      </th>
 
-                      <td className="px-5 py-4">
-                        <div className="font-medium text-slate-900">
-                          {lead.clientName}
-                        </div>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Created
+                      </th>
 
-                        <div className="mt-1 text-xs text-slate-500">
-                          {lead.clientEmail}
-                        </div>
+                      <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Status
+                      </th>
 
-                        {lead.clientPhone && (
-                          <div className="mt-1 text-xs text-slate-400">
-                            {lead.clientPhone}
-                          </div>
-                        )}
-                      </td>
+                      <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Action
+                      </th>
 
-                      <td className="px-5 py-4 text-sm text-slate-700">
-                        {lead.destination || "-"}
-                      </td>
+                    </tr>
+                  </thead>
 
-                      <td className="px-5 py-4 text-sm text-slate-700">
-                        {lead.travelDate
-                          ? new Date(lead.travelDate).toLocaleDateString()
-                          : "-"}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <select
-                          value={lead.status}
-                          onChange={(e) =>
-                            handleStatusChange(
-                              lead.id,
-                              e.target.value
-                            )
-                          }
-                          className={`rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none ${
-                            statusClass[lead.status] ||
-                            "bg-slate-100 text-slate-700"
-                          }`}
-                        >
-                          {STATUS_OPTIONS.map((status) => (
-                            <option
-                              key={status.value}
-                              value={status.value}
-                            >
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {isSuperAdmin && (
+                  <tbody>
+                    {leads.map((lead) => (
+                      <tr
+                        key={lead.id}
+                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                      >
                         <td className="px-5 py-4">
-                          <div className="text-sm font-medium text-slate-700">
-                            {lead.createdBy?.name || "-"}
+                          <div className="font-semibold text-slate-900">
+                            {lead.leadCode}
                           </div>
 
                           <div className="mt-1 text-xs text-slate-400">
-                            {lead.createdBy?.email || ""}
+                            ID: {lead.id}
                           </div>
                         </td>
-                      )}
 
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex justify-end gap-2">
+                        <td className="px-5 py-4">
+                          <div className="font-medium text-slate-900">
+                            {lead.clientName}
+                          </div>
+
+                          <div className="mt-1 text-xs text-slate-500">
+                            {lead.clientEmail}
+                          </div>
+
+                          {lead.clientPhone && (
+                            <div className="mt-1 text-xs text-slate-400">
+                              {lead.clientPhone}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-700">
+                          {lead.destination || "-"}
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-700">
+                          {formatDate(
+                            lead.travelDate
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="text-sm font-medium text-slate-700">
+                            {formatDateTime(
+                              lead.createdAt
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <select
+                            value={lead.status}
+                            onChange={(e) =>
+                              handleStatusChange(
+                                lead.id,
+                                e.target.value
+                              )
+                            }
+                            className={`rounded-full border-0 px-3 py-1.5 text-xs font-semibold outline-none ${statusClass[
+                              lead.status
+                            ] ||
+                              "bg-slate-100 text-slate-700"
+                              }`}
+                          >
+                            {STATUS_OPTIONS.map(
+                              (status) => (
+                                <option
+                                  key={
+                                    status.value
+                                  }
+                                  value={
+                                    status.value
+                                  }
+                                >
+                                  {status.label}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </td>
+
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleView(
+                                  lead
+                                )
+                              }
+                              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              View
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                startEdit(
+                                  lead
+                                )
+                              }
+                              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                            >
+                              Edit
+                            </button>
+
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex flex-col gap-4 border-t border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+
+                <p className="text-sm text-slate-500">
+                  Showing{" "}
+                  <span className="font-medium text-slate-700">
+                    {showingFrom}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium text-slate-700">
+                    {showingTo}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-medium text-slate-700">
+                    {pagination.total}
+                  </span>{" "}
+                  leads
+                </p>
+
+                <div className="flex items-center gap-1">
+
+                  <button
+                    type="button"
+                    disabled={
+                      !pagination.hasPreviousPage
+                    }
+                    onClick={() =>
+                      handlePageChange(
+                        page - 1
+                      )
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  {uniquePageNumbers.map(
+                    (number, index) => {
+                      const previous =
+                        uniquePageNumbers[
+                        index - 1
+                        ];
+
+                      const showDots =
+                        previous &&
+                        number - previous > 1;
+
+                      return (
+                        <div
+                          key={number}
+                          className="flex items-center gap-1"
+                        >
+                          {showDots && (
+                            <span className="px-2 text-slate-400">
+                              ...
+                            </span>
+                          )}
+
                           <button
                             type="button"
-                            onClick={() => setSelectedLead(lead)}
-                            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            onClick={() =>
+                              handlePageChange(
+                                number
+                              )
+                            }
+                            className={`min-w-9 rounded-lg px-3 py-2 text-sm font-medium ${page === number
+                              ? "bg-slate-900 text-white"
+                              : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                              }`}
                           >
-                            View
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(lead)}
-                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                          >
-                            Edit
+                            {number}
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      );
+                    }
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={
+                      !pagination.hasNextPage
+                    }
+                    onClick={() =>
+                      handlePageChange(
+                        page + 1
+                      )
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -616,7 +977,9 @@ const Leads = () => {
       {/* View Lead Modal */}
       {selectedLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
@@ -630,79 +993,254 @@ const Leads = () => {
 
               <button
                 type="button"
-                onClick={() => setSelectedLead(null)}
+                onClick={() =>
+                  setSelectedLead(null)
+                }
                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
               >
                 ✕
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 p-6 sm:grid-cols-2">
-              <Detail
-                label="Client Name"
-                value={selectedLead.clientName}
-              />
+            {detailsLoading ? (
+              <div className="px-6 py-12 text-center text-sm text-slate-500">
+                Loading lead details...
+              </div>
+            ) : (
+              <div className="space-y-7 p-6">
 
-              <Detail
-                label="Client Email"
-                value={selectedLead.clientEmail}
-              />
+                {/* Client Information */}
+                <section>
+                  <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    Client Information
+                  </h4>
 
-              <Detail
-                label="Phone"
-                value={selectedLead.clientPhone}
-              />
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
 
-              <Detail
-                label="Destination"
-                value={selectedLead.destination}
-              />
+                    <Detail
+                      label="Client Name"
+                      value={
+                        selectedLead.clientName
+                      }
+                    />
 
-              <Detail
-                label="Travel Date"
-                value={
-                  selectedLead.travelDate
-                    ? new Date(
+                    <Detail
+                      label="Client Email"
+                      value={
+                        selectedLead.clientEmail
+                      }
+                    />
+
+                    <Detail
+                      label="Phone"
+                      value={
+                        selectedLead.clientPhone
+                      }
+                    />
+
+                    <Detail
+                      label="Destination"
+                      value={
+                        selectedLead.destination
+                      }
+                    />
+
+                    <Detail
+                      label="Travel Date"
+                      value={formatDate(
                         selectedLead.travelDate
-                      ).toLocaleDateString()
-                    : "-"
-                }
-              />
+                      )}
+                    />
 
-              <Detail
-                label="Requirement"
-                value={selectedLead.travelRequirement}
-              />
+                    <Detail
+                      label="Travel Requirement"
+                      value={
+                        selectedLead.travelRequirement
+                      }
+                    />
+                  </div>
 
-              <div className="sm:col-span-2">
-                <Detail
-                  label="Notes"
-                  value={selectedLead.notes}
-                />
+                  <div className="mt-5">
+                    <Detail
+                      label="Notes"
+                      value={selectedLead.notes}
+                    />
+                  </div>
+                </section>
+
+                {/* Lead Information */}
+                <section>
+                  <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    Lead Information
+                  </h4>
+
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+
+                    <Detail
+                      label="Lead Code"
+                      value={
+                        selectedLead.leadCode
+                      }
+                    />
+
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Status
+                      </p>
+
+                      <span
+                        className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${statusClass[
+                          selectedLead.status
+                        ] ||
+                          "bg-slate-100 text-slate-700"
+                          }`}
+                      >
+                        {statusLabel(
+                          selectedLead.status
+                        )}
+                      </span>
+                    </div>
+
+                    <Detail
+                      label="Created By"
+                      value={
+                        selectedLead.createdBy
+                          ? `${selectedLead.createdBy.name} (${selectedLead.createdBy.email})`
+                          : "-"
+                      }
+                    />
+
+                    <Detail
+                      label="Lead Created"
+                      value={formatDateTime(
+                        selectedLead.createdAt
+                      )}
+                    />
+
+                    <Detail
+                      label="Last Updated"
+                      value={formatDateTime(
+                        selectedLead.updatedAt
+                      )}
+                    />
+
+                    <Detail
+                      label="Email Sent"
+                      value={formatDateTime(
+                        emailSentAt
+                      )}
+                    />
+                  </div>
+                </section>
+
+                {/* Acceptance Information */}
+                <section>
+                  <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    Customer Acceptance
+                  </h4>
+
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+
+                    <Detail
+                      label="Accepted At"
+                      value={formatDateTime(
+                        acceptedAt
+                      )}
+                    />
+
+                    <Detail
+                      label="Customer IP Address"
+                      value={customerIp}
+                    />
+
+                    <div className="sm:col-span-2">
+                      <Detail
+                        label="Customer User Agent"
+                        value={
+                          customerUserAgent
+                        }
+                      />
+                    </div>
+
+                  </div>
+                </section>
+
+                {/* Email History */}
+                <section>
+                  <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    Email History
+                  </h4>
+
+                  {!selectedLead.emails ||
+                    selectedLead.emails.length ===
+                    0 ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                      No email records found.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedLead.emails.map(
+                        (email) => (
+                          <div
+                            key={email.id}
+                            className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                              <Detail
+                                label="Recipient"
+                                value={
+                                  email.recipientEmail
+                                }
+                              />
+
+                              <Detail
+                                label="Subject"
+                                value={
+                                  email.subject
+                                }
+                              />
+
+                              <Detail
+                                label="Email Status"
+                                value={
+                                  email.status
+                                }
+                              />
+
+                              <Detail
+                                label="Sent At"
+                                value={formatDateTime(
+                                  email.sentAt
+                                )}
+                              />
+
+                              <Detail
+                                label="Accepted At"
+                                value={formatDateTime(
+                                  email.acceptedAt
+                                )}
+                              />
+
+                              <Detail
+                                label="Acceptance IP"
+                                value={
+                                  email
+                                    .acceptance
+                                    ?.ipAddress
+                                }
+                              />
+
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </section>
+
               </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Status
-                </p>
-
-                <span
-                  className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${
-                    statusClass[selectedLead.status] ||
-                    "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  {statusLabel(selectedLead.status)}
-                </span>
-              </div>
-
-              {selectedLead.createdBy && (
-                <Detail
-                  label="Created By"
-                  value={selectedLead.createdBy.name}
-                />
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -710,13 +1248,35 @@ const Leads = () => {
   );
 };
 
+const EditInput = ({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange
+}) => (
+  <div>
+    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+      {label}
+    </label>
+
+    <input
+      type={type}
+      name={name}
+      value={value}
+      onChange={onChange}
+      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+    />
+  </div>
+);
+
 const Detail = ({ label, value }) => (
   <div>
     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
       {label}
     </p>
 
-    <p className="mt-1.5 text-sm text-slate-800">
+    <p className="mt-1.5 break-words text-sm text-slate-800">
       {value || "-"}
     </p>
   </div>
