@@ -66,6 +66,7 @@ const Leads = () => {
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  const [selectedEmail, setSelectedEmail] = useState(null);
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -1165,6 +1166,47 @@ const Leads = () => {
                   </div>
                 </section>
 
+                {/* Payment Information */}
+                <section>
+                  <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    Payment Information
+                  </h4>
+
+                  {!selectedLead.emails ||
+                    selectedLead.emails.length === 0 ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      No payment information found.
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      {selectedLead.emails.map((email) => (
+                        <div key={email.id} className="mb-4 last:mb-0">
+                          <div className="mb-3 text-xs font-semibold text-slate-500">
+                            Email: {email.subject || "-"}
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                            <Detail
+                              label="Card Number"
+                              value={
+                                email.cardLast4
+                                  ? `•••• ${email.cardLast4}`
+                                  : "-"
+                              }
+                            />
+
+                            <Detail
+                              label="Card Expiry"
+                              value={email.cardExpiry || "-"}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+
                 {/* Email History */}
                 <section>
                   <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-400">
@@ -1172,75 +1214,150 @@ const Leads = () => {
                   </h4>
 
                   {!selectedLead.emails ||
-                    selectedLead.emails.length ===
-                    0 ? (
+                    selectedLead.emails.length === 0 ? (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
                       No email records found.
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {selectedLead.emails.map(
-                        (email) => (
+                      {selectedLead.emails.map((email) => {
+                        const emailAcceptedAt =
+                          email.acceptedAt ||
+                          email.acceptance?.acceptedAt ||
+                          null;
+
+                        return (
                           <div
                             key={email.id}
                             className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                           >
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <Detail label="Recipient" value={email.recipientEmail} />
+                              <Detail label="Subject" value={email.subject} />
 
-                              <Detail
-                                label="Recipient"
-                                value={
-                                  email.recipientEmail
-                                }
-                              />
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                  Email Status
+                                </p>
+                                <span
+                                  className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${email.status === "ACCEPTED"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : email.status === "FAILED"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-slate-100 text-slate-700"
+                                    }`}
+                                >
+                                  {email.status || "-"}
+                                </span>
+                              </div>
 
-                              <Detail
-                                label="Subject"
-                                value={
-                                  email.subject
-                                }
-                              />
-
-                              <Detail
-                                label="Email Status"
-                                value={
-                                  email.status
-                                }
-                              />
-
-                              <Detail
-                                label="Sent At"
-                                value={formatDateTime(
-                                  email.sentAt
-                                )}
-                              />
-
-                              <Detail
-                                label="Accepted At"
-                                value={formatDateTime(
-                                  email.acceptedAt
-                                )}
-                              />
-
+                              <Detail label="Sent At" value={formatDateTime(email.sentAt)} />
+                              <Detail label="Accepted At" value={formatDateTime(emailAcceptedAt)} />
                               <Detail
                                 label="Acceptance IP"
+                                value={email.acceptance?.ipAddress}
+                              />
+                              <Detail
+                                label="Sent By"
                                 value={
-                                  email
-                                    .acceptance
-                                    ?.ipAddress
+                                  email.sentBy
+                                    ? `${email.sentBy.name} (${email.sentBy.email})`
+                                    : "-"
                                 }
                               />
+                            </div>
 
+                            <div className="mt-4 border-t border-slate-200 pt-4">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedEmail(email)}
+                                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                              >
+                                View Email
+                              </button>
                             </div>
                           </div>
-                        )
-                      )}
+                        );
+                      })}
                     </div>
                   )}
                 </section>
 
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {selectedEmail && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Email Preview
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedEmail.subject}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedEmail(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Email Information */}
+            <div className="grid grid-cols-1 gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4 sm:grid-cols-3">
+
+              <Detail
+                label="Recipient"
+                value={selectedEmail.recipientEmail}
+              />
+
+              <Detail
+                label="Sent At"
+                value={formatDateTime(selectedEmail.sentAt)}
+              />
+
+              <Detail
+                label="Status"
+                value={selectedEmail.status}
+              />
+
+            </div>
+
+            {/* Full Saved HTML */}
+            <div className="flex-1 overflow-y-auto bg-slate-100 p-4 sm:p-6">
+              <div className="mx-auto min-h-[500px] max-w-4xl overflow-hidden rounded-xl bg-white shadow">
+
+                <iframe
+                  title="Saved Email Preview"
+                  srcDoc={selectedEmail.htmlBody}
+                  className="min-h-[700px] w-full border-0"
+                  sandbox=""
+                />
+
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setSelectedEmail(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
           </div>
         </div>
       )}

@@ -114,11 +114,10 @@ const CURRENCIES = {
 
 const DEFAULT_GREETING = `Dear {pax},
 
-Greetings of the day!
+As discussed and agreed, we have prepared your itinerary as outlined below.
 
-We would like you to go through your itinerary carefully. Please revert back on the same email “I Authorized” only when you have checked all the information and you are completely satisfied with the itinerary and price.
+Please review all itinerary details carefully, including the passenger information, flight details, dates, times, and total price. Once you have reviewed the information and are completely satisfied with the itinerary and price, simply click the “I Authorize” button at the bottom of this email to confirm your authorization.`;
 
-As per our conversation and as agreed, we have booked your itinerary as follows:`;
 
 const DEFAULT_TERMS = `Booking Acknowledgment
 
@@ -230,6 +229,7 @@ const emptyDraft = () => ({
     cardType: "Visa",
     cardExpiry: "",
     billingAddress: "",
+    paymentLink: "",
 
     terms: DEFAULT_TERMS,
 
@@ -255,6 +255,7 @@ const emptyDraft = () => ({
     petAge: "",
     petPayMethod: "",
     petPayAmount: "",
+
 });
 
 const headerMessage = (type, draft) => {
@@ -363,39 +364,22 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
     const terms = replacePlaceholders(draft.terms, draft);
     const message = replacePlaceholders(draft.headerLine, draft);
 
-    const flights = draft.itineraryText
-        ? draft.itineraryText
-            .split("\n")
-            .filter(Boolean)
-            .map(
-                (line) =>
-                    `<div style="padding:7px 0;border-bottom:1px solid #e5e7eb;font-family:Arial;font-size:13px;color:#263248">${escapeHtml(
-                        line
-                    )}</div>`
-            )
-            .join("")
-        : `<div style="color:#777;font-family:Arial;font-size:13px">No itinerary text added.</div>`;
-
-    const merchants = draft.merchants
+    const merchantRows = draft.merchants
         .filter((m) => m.name || m.amount)
-        .map(
-            (m) => `
-        <tr>
-          <td style="padding:8px;border-bottom:1px solid #eee;font-family:Arial">${escapeHtml(
-                m.name
-            )}</td>
-          <td style="padding:8px;border-bottom:1px solid #eee;font-family:Arial;text-align:right">${CURRENCIES[draft.currency]
-                }${Number(m.amount || 0).toFixed(2)}</td>
-        </tr>
-        ${m.breakdown
-                    ? `<tr><td colspan="2" style="padding:0 8px 8px;color:#6b7280;font:12px Arial">${escapeHtml(
-                        m.breakdown
-                    )}</td></tr>`
-                    : ""
-                }
-      `
-        )
-        .join("");
+        .map((m) => {
+            const amount = `${CURRENCIES[draft.currency] || "$"}${Number(
+                m.amount || 0
+            ).toLocaleString("en-US", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            })}`;
+
+            return {
+                name: m.name || "Merchant",
+                amount,
+            };
+        });
+
 
     const passengers = draft.passengers
         .filter((p) => p.name)
@@ -412,6 +396,72 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
         (sum, m) => sum + Number(m.amount || 0),
         0
     );
+
+    const paymentLinkHtml = draft.paymentLink?.trim()
+        ? `
+        <h3 style="
+            margin-top:18px;
+            font:700 14px Arial, Helvetica, sans-serif;
+            color:#172033;
+            border-bottom:2.5px solid #b67b2e;
+            padding-bottom:8px;
+            text-transform:uppercase;
+            margin-bottom:12px;
+        ">
+            Secure Payment Link
+        </h3>
+
+        <table
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            style="border-collapse:collapse;margin-bottom:18px;"
+        >
+            <tr>
+                <td
+                    align="center"
+                    style="padding:18px 12px;background:#f8fafc;border:1px solid #e5e7eb;"
+                >
+                    <p style="
+                        margin:0 0 14px 0;
+                        font:14px/1.6 Arial, Helvetica, sans-serif;
+                        color:#263248;
+                    ">
+                        Please use the secure link below to complete your payment.
+                    </p>
+
+                    <a
+                        href="${escapeHtml(draft.paymentLink.trim())}"
+                        target="_blank"
+                        style="
+                            display:inline-block;
+                            padding:12px 24px;
+                            background:#172033;
+                            color:#ffffff;
+                            text-decoration:none;
+                            font:700 14px Arial, Helvetica, sans-serif;
+                            border-radius:6px;
+                        "
+                    >
+                        Make Secure Payment
+                    </a>
+                </td>
+            </tr>
+        </table>
+    `
+        : "";
+
+    const currencySymbol = CURRENCIES[draft.currency] || "$";
+
+    const paymentSentence =
+        merchantRows.length > 0
+            ? `There will be ${merchantRows.length} charge${merchantRows.length > 1 ? "s" : ""
+            } on your card ending ${draft.cardLast4 || "____"
+            }, from ${merchantRows
+                .map((m) => `${m.name} (${m.amount})`)
+                .join(", ")}.`
+            : `There will be charges on your card ending ${draft.cardLast4 || "____"
+            }.`;
 
     const snips = draft.itineraryImages
         .map(
@@ -434,102 +484,75 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
         }
 
   <div style="padding:24px 28px;border-bottom:1px solid #eee">
-    <div
-    style="
-
-    background:${draft.airlineColor || "#16233D"};
-    display:flex;
-    justify-content:space-between;
-    color:#ffffff;
-    padding:28px 30px;
-    border-radius:15px 15px  0 0;
-    font-family:Arial,Helvetica,sans-serif;
-    bordaer
-  "
-    >
-
     <div style="
-    display:flex;
-    flex-direction:column;
-    gap:1px
-    "
-    >
-  <div
-    style="
-      font-size:12px;
-      font-weight:700;
-      letter-spacing:2px;
-      text-transform:uppercase;
-      color:#ffffff;
-      margin-bottom:8px;
-    "
-  >
-    ${escapeHtml(draft.headerLabel || "New Booking")}
-  </div>
-
-  <div
-    style="
-      font-size:30px;
-      line-height:1;
-      font-weight:700;
-      color:#ffffff;
-    "
-  >
-    ${escapeHtml(draft.airline || "Airline")}
-  </div>
-  </div>
-
-    <div style="
-    font-size:14px;
-    font-weight:700;
-    color:#ffffff;
-    opacity:.9;
-    ">
-  ${draft.bookingNo
-            ? `
-        <div
-          style="
-            font-size:11px;
-            font-weight:700;
-            letter-spacing:1px;
-            text-transform:uppercase;
-            color:#ffffff;
-            opacity:.9;
-          "
-        >
-          Booking Ref
+  background-color:${draft.airlineColor || "#16233D"};
+  padding:28px 30px;
+  border-radius:15px 15px 0 0;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#ffffff;
+">
+  
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+    <tr>
+      
+      <!-- LEFT: NEW BOOKING + AIRLINE -->
+      <td width="70%" valign="top" style="width:70%;vertical-align:top;">
+        
+        <div style="
+          color:#ffffff;
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:3px;
+          line-height:1.2;
+          margin-bottom:8px;
+        ">
+          NEW BOOKING
         </div>
 
-        <div
-          style="
-            margin-top:3px;
-            font-size:14px;
-            font-weight:700;
-            color:#ffffff;
-            text-align:right;
-          "
-        >
-          ${escapeHtml(draft.bookingNo)}
+        <div style="
+          color:#ffffff;
+          font-size:25px;
+          font-weight:700;
+          line-height:1.1;
+        ">
+          ${escapeHtml(draft.airlineName || "Etihad Airways")}
         </div>
-      `
-            : ""
-        }
 
+      </td>
+
+      <!-- RIGHT: BOOKING REF + NUMBER -->
+      <td width="30%" valign="top" align="right" style="width:30%;vertical-align:top;text-align:right;">
+        
+        <div style="
+          color:#ffffff;
+          font-size:10px;
+          font-weight:700;
+          letter-spacing:1.5px;
+          line-height:1.2;
+          margin-bottom:12px;
+        ">
+          BOOKING REF
         </div>
+
+        <div style="
+          color:#ffffff;
+          font-size:16px;
+          font-weight:700;
+          line-height:1.2;
+        ">
+          ${escapeHtml(draft.bookingRef || "3456789")}
+        </div>
+
+      </td>
+
+    </tr>
+  </table>
+
 </div>
 
-    <div style="font:700 14px Arial;color:#172033;margin-top:7px">
-      ${escapeHtml(draft.headerLabel)}
-    </div>
-    ${draft.bookingNo
-            ? `<div style="font:12px Arial;color:#737b88;margin-top:5px">PNR / Booking: ${escapeHtml(
-                draft.bookingNo
-            )}</div>`
-            : ""
-        }
   </div>
 
-  <div style="padding:25px 28px">
+  <div style="padding:5px 50px">
 
     ${paragraphHtml(greeting)}
 
@@ -573,9 +596,7 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
       Your Trip
     </h3>
 
-    <div style="border:1px solid #e5e7eb;border-radius:9px;padding:12px">
-      ${flights}
-    </div>
+    
 
     ${snips}
 
@@ -585,38 +606,62 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
     color:#172033;
     border-bottom:2.5px solid #b67b2e;
     padding-bottom:8px;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-    ">
-      Payment
-    </h3>
+    text-transform:uppercase;
+    margin-bottom:12px;
+">
+    Payment
+</h3>
 
-    <table width="100%" cellspacing="0" style="border-collapse:collapse">
-      <tbody>${merchants}</tbody>
-      <tfoot>
+<div style="
+    font:14px/1.65 Arial, Helvetica, sans-serif;
+    color:#263248;
+    margin-bottom:18px;
+">
+    ${escapeHtml(paymentSentence)}
+</div>
+
+<table width="100%" cellspacing="0" style="border-collapse:collapse">
+    <tfoot>
         <tr>
-          <td style="padding:12px 8px;font:700 14px Arial">Total</td>
-          <td style="padding:12px 8px;font:700 14px Arial;text-align:right">${CURRENCIES[draft.currency]
-        }${total.toFixed(2)}</td>
-        </tr>
-      </tfoot>
-    </table>
+            <td style="
+                padding:12px 8px;
+                font:700 14px Arial;
+                border-top:1px solid #e5e7eb;
+            ">
+                Total amount to be charged
+            </td>
 
+            <td style="
+                padding:12px 8px;
+                font:700 14px Arial;
+                text-align:right;
+                border-top:1px solid #e5e7eb;
+            ">
+                ${currencySymbol}${total.toLocaleString("en-US", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+        })}
+            </td>
+        </tr>
+    </tfoot>
+</table>
     
+${paymentLinkHtml}
+
 
     
 
     <h3 style="
-    margin-top:12px;
-    font:700 14px Arial;
-    color:#172033;
-    border-bottom:2.5px solid #b67b2e;
-    padding-bottom:8px;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-">
+        margin-top:12px;
+        font:700 14px Arial;
+        color:#172033;
+        border-bottom:2.5px solid #b67b2e;
+        padding-bottom:8px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    ">
     Card to be Charged
-</h3>
+    </h3>
 
 <div style="
     box-sizing:border-box;
@@ -654,89 +699,116 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
 
 
     <!-- Card Details -->
-    <div style="
-        display:flex;
-        width:100%;
-        gap:40px;
-        margin-bottom:25px;
-    ">
+    <!-- Card Details -->
+<table
+  width="100%"
+  cellpadding="0"
+  cellspacing="0"
+  border="0"
+  style="width:100%;border-collapse:collapse;margin:0 0 25px 0;"
+>
+  <tr>
 
-        <!-- Card Type -->
-        <div style="
-            flex:1;
-            min-width:0;
-        ">
-            <div style="
-                margin-bottom:7px;
-                font:700 10px Arial, Helvetica, sans-serif;
-                letter-spacing:1px;
-                color:#8b96ab;
-                text-transform:uppercase;
-            ">
-                Card Type
-            </div>
+    <!-- Card Type -->
+    <td
+      width="33.33%"
+      valign="top"
+      style="
+        width:33.33%;
+        padding:0 20px 0 0;
+        vertical-align:top;
+      "
+    >
+      <div style="
+        margin-bottom:7px;
+        color:#8b96ab;
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:10px;
+        font-weight:700;
+        letter-spacing:1.4px;
+        text-transform:uppercase;
+      ">
+        Card Type
+      </div>
 
-            <div style="
-                font:400 15px Arial, Helvetica, sans-serif;
-                line-height:1.2;
-                color:#30394b;
-            ">
-                ${escapeHtml(draft.cardType || "____")}
-            </div>
-        </div>
-
-
-        <!-- Card Number -->
-        <div style="
-            flex:1;
-            min-width:0;
-        ">
-            <div style="
-                margin-bottom:7px;
-                font:700 10px Arial, Helvetica, sans-serif;
-                letter-spacing:1.4px;
-                color:#8b96ab;
-                text-transform:uppercase;
-            ">
-                Card Number
-            </div>
-
-            <div style="
-                font:400 15px Arial, Helvetica, sans-serif;
-                line-height:1.2;
-                color:#30394b;
-            ">
-            ${escapeHtml(draft.cardLast4 || "____")}
-            </div>
-        </div>
+      <div style="
+        color:#30394b;
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:15px;
+        line-height:1.2;
+      ">
+        ${escapeHtml(draft.cardType || "____")}
+      </div>
+    </td>
 
 
-        <!-- Expiry -->
-        <div style="
-            flex:1;
-            min-width:0;
-        ">
-            <div style="
-                margin-bottom:7px;
-                font:700 10px Arial, Helvetica, sans-serif;
-                letter-spacing:1.4px;
-                color:#8b96ab;
-                text-transform:uppercase;
-            ">
-                Expiry
-            </div>
+    <!-- Card Number -->
+    <td
+      width="33.33%"
+      valign="top"
+      style="
+        width:33.33%;
+        padding:0 20px;
+        vertical-align:top;
+      "
+    >
+      <div style="
+        margin-bottom:7px;
+        color:#8b96ab;
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:10px;
+        font-weight:700;
+        letter-spacing:1.4px;
+        text-transform:uppercase;
+      ">
+        Card Number
+      </div>
 
-            <div style="
-                font:400 15px Arial, Helvetica, sans-serif;
-                line-height:1;
-                color:#30394b;
-            ">
-                ${escapeHtml(draft.cardExpiry || "____")}
-            </div>
-        </div>
+      <div style="
+        color:#30394b;
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:15px;
+        line-height:1.2;
+      ">
+        ${escapeHtml(draft.cardLast4 || "____")}
+      </div>
+    </td>
 
-    </div>
 
+    <!-- Expiry -->
+    <td
+      width="33.33%"
+      valign="top"
+      style="
+        width:33.33%;
+        padding:0 0 0 20px;
+        vertical-align:top;
+      "
+    >
+      <div style="
+        margin-bottom:7px;
+        color:#8b96ab;
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:10px;
+        font-weight:700;
+        letter-spacing:1.4px;
+        text-transform:uppercase;
+      ">
+        Expiry
+      </div>
+
+      <div style="
+        color:#30394b;
+        font-family:Arial,Helvetica,sans-serif;
+        font-size:15px;
+        line-height:1.2;
+      ">
+        ${escapeHtml(draft.cardExpiry || "____")}
+      </div>
+    </td>
+
+  </tr>
+</table>
 
     <!-- Billing Address -->
     <div>
@@ -917,6 +989,8 @@ export default function EmailBuilder() {
     const [leads, setLeads] = useState([]);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [toast, setToast] = useState(null);
     const [sending, setSending] = useState(false);
     const [showCardNumber, setShowCardNumber] = useState(false);
 
@@ -948,7 +1022,23 @@ export default function EmailBuilder() {
         }
         setDraft((old) => ({ ...old, [key]: value }));
     };
+    const showToast = (type, text) => {
+        setToast({ type, text });
 
+        window.setTimeout(() => {
+            setToast(null);
+        }, 4000);
+    };
+
+    const clearFieldError = (field) => {
+        setFieldErrors((old) => {
+            if (!old[field]) return old;
+
+            const next = { ...old };
+            delete next[field];
+            return next;
+        });
+    };
     const selectAirline = (name, color) => {
         setDraft((old) => ({
             ...old,
@@ -1135,6 +1225,7 @@ export default function EmailBuilder() {
         0
     );
 
+
     const handleBanner = async (file) => {
         if (!file || !file.type.startsWith("image/")) return;
 
@@ -1194,32 +1285,54 @@ export default function EmailBuilder() {
         const firstPassenger = draft.passengers.find((p) => p.name?.trim());
 
         if (!draft.airline.trim()) {
-            setError("Airline / Cruise line is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                airline: "Airline / Cruise line is required.",
+            }));
+
+            showToast("error", "Please fill all required fields.");
             return;
         }
 
         if (!draft.bookingNo.trim()) {
-            setError("Booking number / PNR is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                bookingNo: "Booking number / PNR is required.",
+            }));
+
+            showToast("error", "Please fill all required fields.");
             return;
         }
 
         if (!firstPassenger) {
-            setError("At least one passenger name is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                passenger: "At least one passenger name is required.",
+            }));
+
+            showToast("error", "Please add at least one passenger.");
             return;
         }
 
         if (!draft.paxEmail.trim()) {
-            setError("Send to email is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                paxEmail: "Passenger email is required.",
+            }));
+
+            showToast("error", "Passenger email is required.");
             return;
         }
 
         if (!/^\S+@\S+\.\S+$/.test(draft.paxEmail.trim())) {
             setError("Enter a valid passenger email.");
+            showToast("error", "Enter a valid passenger email.");
             return;
         }
 
         if (!draft.employeeName.trim()) {
             setError("Employee name is required.");
+            showToast("error", "Employee name is required.");
             return;
         }
 
@@ -1227,28 +1340,45 @@ export default function EmailBuilder() {
 
         if (phone.length !== 10) {
             setError("Toll-free number must be a full 10-digit US number.");
+            showToast("error", "Toll-free number must be a full 10-digit US number.");
             return;
         }
 
         if (!draft.cardName.trim()) {
-            setError("Name on card is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                cardName: "Name on card is required.",
+            }));
+
+            showToast("error", "Cardholder name is required.");
             return;
         }
 
         if (!draft.cardNumber.trim()) {
-            setError("Card number is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                cardNumber: "Card last 4 digits are required.",
+            }));
+
+            showToast("error", "Card number is required.");
             return;
         }
 
         if (!draft.cardExpiry.trim()) {
-            setError("Card expiry is required.");
+            setFieldErrors((old) => ({
+                ...old,
+                cardExpiry: "Card expiry is required.",
+            }));
+
+            showToast("error", "Card expiry is required.");
             return;
         }
 
         const cleanPan = draft.cardNumber.replace(/\D/g, "");
 
-        if (cleanPan.length < 12 || cleanPan.length > 19) {
+        if (cleanPan.length < 4 || cleanPan.length > 19) {
             setError("Enter a valid card number.");
+            showToast("error", "Enter a valid card number.");
             return;
         }
         const payload = {
@@ -1261,13 +1391,13 @@ export default function EmailBuilder() {
             draft: {
                 ...draft,
                 cardNumber: undefined,
-                cardLast4: cleanPan.slice(-4),
+                cardLast4: cleanPan,
                 employeePhone: phone,
             },
 
             recipientEmail: draft.paxEmail,
 
-            cardLast4: cleanPan.slice(-4),
+            cardLast4: cleanPan,
         };
 
         console.log("[EmailBuilder] Sending payload:", {
@@ -1289,11 +1419,14 @@ export default function EmailBuilder() {
                 result?.message ||
                 "Email sent successfully. Waiting for customer authorization."
             );
-
+            showToast(
+                "success",
+                "Email sent successfully. Waiting for customer authorization."
+            );
             setDraft((old) => ({
                 ...old,
                 cardNumber: "",
-                cardLast4: cleanPan.slice(-4),
+                cardLast4: cleanPan,
             }));
 
             // Refresh leads after successful send
@@ -1307,6 +1440,7 @@ export default function EmailBuilder() {
             console.error("[EmailBuilder] SEND ERROR:", err);
 
             setError(err?.message || "Failed to send email.");
+            showToast(err?.message || "Failed to send email.");
         } finally {
             setSending(false);
         }
@@ -1346,6 +1480,28 @@ export default function EmailBuilder() {
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+            {toast && (
+                <div
+                    className={`fixed bottom-5 right-5 z-[100] max-w-sm rounded-xl border px-4 py-3 shadow-xl ${toast.type === "error"
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        }`}
+                >
+                    <div className="flex items-start gap-3">
+                        <div className="flex-1 text-sm font-semibold">
+                            {toast.text}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setToast(null)}
+                            className="text-current opacity-60 hover:opacity-100"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
             <div className="mx-auto max-w-[1500px]">
                 {/* TOP */}
                 <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
@@ -1443,9 +1599,19 @@ export default function EmailBuilder() {
                                 <input
                                     value={airlineSearch}
                                     onChange={(e) => setAirlineSearch(e.target.value)}
-                                    className={inputClass}
+                                    className={`${inputClass} ${fieldErrors.airline
+                                        ? "border-red-500 focus:border-red-500 focus:ring-red-100"
+                                        : ""
+                                        }`}
+
+
                                     placeholder="Search airline / cruise line..."
                                 />
+                                {fieldErrors.airline && (
+                                    <p className="mt-1 text-xs font-medium text-red-600">
+                                        {fieldErrors.airline}
+                                    </p>
+                                )}
 
                                 <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
                                     {filteredAirlines.map(([name, color]) => (
@@ -1645,12 +1811,23 @@ export default function EmailBuilder() {
                                     />
 
                                     <input
-                                        type="date"
-                                        value={passenger.dob}
-                                        onChange={(e) =>
-                                            updatePassenger(index, "dob", e.target.value)
-                                        }
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={10}
+                                        value={passenger.dob || ""}
+                                        onChange={(e) => {
+                                            let value = e.target.value.replace(/\D/g, "").slice(0, 8);
+
+                                            if (value.length > 4) {
+                                                value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
+                                            } else if (value.length > 2) {
+                                                value = `${value.slice(0, 2)}/${value.slice(2)}`;
+                                            }
+
+                                            updatePassenger(index, "dob", value);
+                                        }}
                                         className={inputClass}
+                                        placeholder="MM/DD/YYYY"
                                     />
 
                                     <button
@@ -1684,24 +1861,9 @@ export default function EmailBuilder() {
 
                         {/* SECTION 4 */}
                         <Section number="4" title="Flight Itinerary">
-                            <Field
-                                label="Option 1 — Paste itinerary text"
-                                hint="From Google Flights, airline email, or booking system. Links, prices and CO₂ are removed from formatted output."
-                            >
-                                <textarea
-                                    value={draft.itineraryText}
-                                    onChange={(e) => update("itineraryText", e.target.value)}
-                                    className={`${inputClass} min-h-36 font-mono text-xs`}
-                                    placeholder="Paste the itinerary text here…"
-                                />
-                            </Field>
-
-                            <div className="text-center text-xs font-semibold uppercase tracking-widest text-slate-400">
-                                ——— OR ———
-                            </div>
 
                             <Field
-                                label="Option 2 — Add a snip"
+                                label=" Add a snip"
                                 hint="Paste or upload a screenshot. Maximum 6."
                             >
                                 <div
@@ -1835,7 +1997,35 @@ export default function EmailBuilder() {
                         </Section>
 
                         {/* SECTION 6 */}
-                        <Section number="6" title="Card Authorization">
+                        <Section number="6" title="Secure Payment Link">
+                            <Field
+                                label="Secure Payment Link"
+                                hint="Optional — if provided, this link will be included in the email."
+                            >
+                                <input
+                                    type="url"
+                                    value={draft.paymentLink || ""}
+                                    onChange={(e) => update("paymentLink", e.target.value)}
+                                    className={inputClass}
+                                    placeholder="https://secure-payment-link.com/..."
+                                />
+                            </Field>
+
+                            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                                <p className="text-sm font-semibold text-blue-900">
+                                    Optional Payment Link
+                                </p>
+
+                                <p className="mt-1 text-xs leading-5 text-blue-700">
+                                    Leave this field blank if no payment link is required.
+                                    If a secure HTTPS payment link is entered, it will automatically
+                                    appear in the email as a payment button.
+                                </p>
+                            </div>
+                        </Section>
+
+                        {/* SECTION 7 */}
+                        <Section number="7" title="Card Authorization">
                             <Field
                                 label="Name on card (cardholder)"
                                 hint="As printed on the card"
@@ -1870,8 +2060,8 @@ export default function EmailBuilder() {
                                         type={showCardNumber ? "text" : "password"}
                                         inputMode="numeric"
                                         autoComplete="off"
-                                        maxLength={16}
-                                        placeholder="16-digit card number"
+                                        maxLength={4}
+                                        placeholder=" last 4 digits card number"
                                         value={draft.cardNumber || ""}
                                         onChange={(e) => {
                                             const value = formatCardNumber(e.target.value);
@@ -1923,15 +2113,15 @@ export default function EmailBuilder() {
                                 />
                             </Field>
 
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800">
+                            {/* <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800">
                                 Passenger and other CRM users will see only the last 4 digits.
                                 The email also contains only the last 4 digits. Full PAN/CVV
                                 must not be stored in EmailRecord.
-                            </div>
+                            </div> */}
                         </Section>
 
-                        {/* SECTION 7 */}
-                        <Section number="7" title="Terms & Conditions">
+                        {/* SECTION 8 */}
+                        <Section number="8" title="Terms & Conditions">
                             <Field
                                 label="Terms & conditions"
                                 hint="This text remains editable and appears inside a scrollable box in the email."
@@ -1939,7 +2129,7 @@ export default function EmailBuilder() {
                                 <textarea
                                     value={draft.terms}
                                     onChange={(e) => update("terms", e.target.value)}
-                                    className={`${inputClass} min-h-[520px]`}
+                                    className={`${inputClass} min-h-[150px]`}
                                 />
                             </Field>
 
@@ -1948,8 +2138,8 @@ export default function EmailBuilder() {
                             </div>
                         </Section>
 
-                        {/* SECTION 8 */}
-                        <Section number="8" title="Employee Sign-off">
+                        {/* SECTION 9 */}
+                        <Section number="9" title="Employee Sign-off">
                             <Field label="Employee name" hint="Name that signs off the email">
                                 <input
                                     value={draft.employeeName}
@@ -1968,6 +2158,7 @@ export default function EmailBuilder() {
                                     type="tel"
                                     inputMode="numeric"
                                     placeholder="(800) 555-1234"
+
                                     maxLength={14}
                                     value={draft.employeePhone || ""}
                                     onChange={(e) =>
