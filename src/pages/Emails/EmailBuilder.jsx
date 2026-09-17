@@ -515,7 +515,7 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
           font-weight:700;
           line-height:1.1;
         ">
-          ${escapeHtml(draft.airlineName || "Etihad Airways")}
+          ${escapeHtml(draft.airline)}
         </div>
 
       </td>
@@ -540,7 +540,7 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
           font-weight:700;
           line-height:1.2;
         ">
-          ${escapeHtml(draft.bookingRef || "3456789")}
+          ${escapeHtml(draft.bookingNo)}
         </div>
 
       </td>
