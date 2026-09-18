@@ -119,15 +119,10 @@ As discussed and agreed, we have prepared your itinerary as outlined below.
 Please review all itinerary details carefully, including the passenger information, flight details, dates, times, and total price. Once you have reviewed the information and are completely satisfied with the itinerary and price, simply click the “I Authorize” button at the bottom of this email to confirm your authorization.`;
 
 
-const DEFAULT_TERMS = `Booking Acknowledgment
+const DEFAULT_TERMS = `Booking Acknowledgement
 
 By confirming your booking, you agree that you've read, understood, and accepted these terms.
 
-Reconfirmation
-
-Flights must be reconfirmed directly through our agency 72 hours before the reservation date.
-
-Special requests (meals, seats, wheelchair, hotel, etc.) must be reconfirmed with us at least 72 hours before travel and are subject to availability.
 
 Changes & Cancellations
 
