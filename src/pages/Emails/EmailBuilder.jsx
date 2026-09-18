@@ -500,18 +500,18 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
         
         <div style="
           color:#ffffff;
-          font-size:10px;
+          font-size:12px;
           font-weight:700;
           letter-spacing:3px;
           line-height:1.2;
           margin-bottom:8px;
         ">
-          NEW BOOKING
+          ${escapeHtml(draft.headerLabel || "NEW BOOKING_______")}
         </div>
 
         <div style="
           color:#ffffff;
-          font-size:25px;
+          font-size:30px;
           font-weight:700;
           line-height:1.1;
         ">
