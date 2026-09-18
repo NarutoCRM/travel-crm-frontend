@@ -126,13 +126,10 @@ By confirming your booking, you agree that you've read, understood, and accepted
 
 Changes & Cancellations
 
-Bookings are changeable and refundable.
-
-Refunds (if applicable) are subject to airline penalties and agency service fees.
-
-No chargebacks will be accepted once the airline processes a refund.
-
-Name corrections may be allowed (typos only), subject to airline policy and fees.
+Your booking may be changed or refunded, subject to the applicable fare and airline policy.
+Where a refund is permitted, penalties and service fees may apply.
+Once the booked services have been provided, no disputes or claims will be accepted.
+Minor name corrections for genuine typing errors may be permitted, subject to Fare rules and applicable fees.
 
 Travel Documents
 
