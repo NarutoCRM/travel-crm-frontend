@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import useAuth from "../../hooks/useAuth.js";
 
 import {
   getLeadsApi,
@@ -59,7 +60,10 @@ const formatDate = (value) => {
 
 const Leads = () => {
   const [leads, setLeads] = useState([]);
+  const { user } = useAuth();
 
+  const isSuperAdmin =
+    user?.role === "SUPER_ADMIN";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [clientFilter, setClientFilter] = useState("");
@@ -102,6 +106,30 @@ const Leads = () => {
     targetStatus = statusFilter,
     targetClient = clientFilter
   } = {}) => {
+
+    const hasSearch =
+      targetSearch.trim() ||
+      targetClient.trim() ||
+      targetStatus;
+
+    // Non-admin ko bina search/filter ke
+    // complete lead list nahi dikhani hai.
+    if (!isSuperAdmin && !hasSearch) {
+      setLeads([]);
+
+      setPagination({
+        page: 1,
+        limit: targetLimit,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false
+      });
+
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -156,7 +184,12 @@ const Leads = () => {
       targetPage: page,
       targetLimit: limit
     });
-  }, [page, limit, statusFilter]);
+  }, [
+    page,
+    limit,
+    statusFilter,
+    isSuperAdmin
+  ]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -187,20 +220,35 @@ const Leads = () => {
     });
   };
 
-  const clearFilters = async () => {
-    setSearch("");
-    setStatusFilter("");
-    setClientFilter("");
-    setPage(1);
+const clearFilters = async () => {
+  setSearch("");
+  setStatusFilter("");
+  setClientFilter("");
+  setPage(1);
 
-    await loadLeads({
-      targetPage: 1,
-      targetLimit: limit,
-      targetSearch: "",
-      targetStatus: "",
-      targetClient: ""
+  if (!isSuperAdmin) {
+    setLeads([]);
+
+    setPagination({
+      page: 1,
+      limit,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false
     });
-  };
+
+    return;
+  }
+
+  await loadLeads({
+    targetPage: 1,
+    targetLimit: limit,
+    targetSearch: "",
+    targetStatus: "",
+    targetClient: ""
+  });
+};
 
   const handleLimitChange = (e) => {
     const newLimit = Number(e.target.value);

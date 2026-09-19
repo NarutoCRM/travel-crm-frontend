@@ -226,7 +226,8 @@ const emptyDraft = () => ({
     terms: DEFAULT_TERMS,
 
     employeeName: "",
-    employeePhone: "",
+    employeePhone: "+1 (877) 341-1026",
+    tncEmail: "airlinesupport@reservationssupports.com",
 
     creditAmount: "",
     cancelFee: "",
@@ -371,6 +372,7 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
             return {
                 name: m.name || "Merchant",
                 amount,
+                breakdown: String(m.breakdown || "").trim(),
             };
         });
 
@@ -451,7 +453,11 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
             ? `There will be ${merchantRows.length} charge${merchantRows.length > 1 ? "s" : ""
             } on your card ending ${draft.cardLast4 || "____"
             }, from ${merchantRows
-                .map((m) => `${m.name} (${m.amount})`)
+                .map(
+                    (m) =>
+                        `${m.name} (${m.amount}${m.breakdown ? ` — ${m.breakdown}` : ""
+                        })`
+                )
                 .join(", ")}.`
             : `There will be charges on your card ending ${draft.cardLast4 || "____"
             }.`;
@@ -894,10 +900,17 @@ ${paymentLinkHtml}
       <div style="font:13px Arial;color:#555;margin-top:3px">
         Reservations Desk
       </div>
-      ${draft.employeePhone
-            ? `<div style="font:13px Arial;color:#555;margin-top:3px">${escapeHtml(
-                draft.employeePhone
-            )}</div>`
+      ${draft.tncEmail
+            ? `<div style="font:13px Arial;color:#555;margin-top:3px">
+        Email: ${escapeHtml(draft.tncEmail)}
+      </div>`
+            : ""
+        }
+
+${draft.employeePhone
+            ? `<div style="font:13px Arial;color:#555;margin-top:3px">
+        Callback No: ${escapeHtml(draft.employeePhone)}
+      </div>`
             : ""
         }
     </div>
@@ -1117,20 +1130,20 @@ export default function EmailBuilder() {
                 return `As requested, your flight has been cancelled. A credit of ${amount(
                     draft.creditAmount
                 )} is being issued${draft.cancelFee
-                        ? ` (a cancellation fee of ${amount(
-                            draft.cancelFee
-                        )} has been deducted and is non-refundable)`
-                        : ""
+                    ? ` (a cancellation fee of ${amount(
+                        draft.cancelFee
+                    )} has been deducted and is non-refundable)`
+                    : ""
                     }.`;
 
             case "cancel_refund":
                 return `As requested, your flight has been cancelled. A refund of ${amount(
                     draft.refundAmount
                 )} is being processed to your Original Payment Method${draft.cancelFee
-                        ? ` (a cancellation fee of ${amount(
-                            draft.cancelFee
-                        )} has been deducted and is non-refundable)`
-                        : ""
+                    ? ` (a cancellation fee of ${amount(
+                        draft.cancelFee
+                    )} has been deducted and is non-refundable)`
+                    : ""
                     }${draft.refundTimeline
                         ? `, within ${draft.refundTimeline}`
                         : ""
@@ -1155,13 +1168,13 @@ export default function EmailBuilder() {
 
             case "cancel_reissue":
                 return `Your booking ${draft.bookingNo || "____"} has been cancelled and re-issued.${draft.refundAmount
-                        ? ` A refund of ${amount(
-                            draft.refundAmount
-                        )} is being processed to your Original Payment Method${draft.refundTimeline
-                            ? ` within ${draft.refundTimeline}`
-                            : ""
-                        }.`
+                    ? ` A refund of ${amount(
+                        draft.refundAmount
+                    )} is being processed to your Original Payment Method${draft.refundTimeline
+                        ? ` within ${draft.refundTimeline}`
                         : ""
+                    }.`
+                    : ""
                     }`;
 
             case "cancel_rebook":
@@ -2638,9 +2651,8 @@ export default function EmailBuilder() {
                             </Field>
 
                             <Field
-                                label="Toll-free number"
-                                required
-                                hint="Required — enter a full 10-digit US number."
+                                label="Employee Number / Callback No"
+                                hint="Callback number shown in the email"
                             >
                                 <input
                                     type="tel"
@@ -2655,6 +2667,20 @@ export default function EmailBuilder() {
                                             employeePhone: formatUSPhone(e.target.value),
                                         }))
                                     }
+                                />
+                            </Field>
+                            <Field
+                                label="Email"
+                                hint="Email address shown in the email signature"
+                            >
+                                <input
+                                    type="email"
+                                    value={draft.tncEmail || ""}
+                                    onChange={(e) =>
+                                        update("tncEmail", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="airlinesupport@reservationssupports.com"
                                 />
                             </Field>
 
