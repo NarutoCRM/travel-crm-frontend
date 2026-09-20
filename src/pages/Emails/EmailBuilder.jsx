@@ -119,25 +119,17 @@ As discussed and agreed, we have prepared your itinerary as outlined below.
 Please review all itinerary details carefully, including the passenger information, flight details, dates, times, and total price. Once you have reviewed the information and are completely satisfied with the itinerary and price, simply click the “I Authorize” button at the bottom of this email to confirm your authorization.`;
 
 
-const DEFAULT_TERMS = `Booking Acknowledgment
+const DEFAULT_TERMS = `Booking Acknowledgement
 
 By confirming your booking, you agree that you've read, understood, and accepted these terms.
 
-Reconfirmation
-
-Flights must be reconfirmed directly through our agency 72 hours before the reservation date.
-
-Special requests (meals, seats, wheelchair, hotel, etc.) must be reconfirmed with us at least 72 hours before travel and are subject to availability.
 
 Changes & Cancellations
 
-Bookings are changeable and refundable.
-
-Refunds (if applicable) are subject to airline penalties and agency service fees.
-
-No chargebacks will be accepted once the airline processes a refund.
-
-Name corrections may be allowed (typos only), subject to airline policy and fees.
+Your booking may be changed or refunded, subject to the applicable fare and airline policy.
+Where a refund is permitted, penalties and service fees may apply.
+Once the booked services have been provided, no disputes or claims will be accepted.
+Minor name corrections for genuine typing errors may be permitted, subject to Fare rules and applicable fees.
 
 Travel Documents
 
@@ -234,7 +226,8 @@ const emptyDraft = () => ({
     terms: DEFAULT_TERMS,
 
     employeeName: "",
-    employeePhone: "",
+    employeePhone: "+1 (877) 341-1026",
+    tncEmail: "airlinesupport@reservationssupports.com",
 
     creditAmount: "",
     cancelFee: "",
@@ -246,6 +239,7 @@ const emptyDraft = () => ({
 
     milesUsed: "",
     milesDollars: "",
+    milesRefunded: "",
 
     seatMap: [],
 
@@ -263,6 +257,7 @@ const headerMessage = (type, draft) => {
         (sum, m) => sum + Number(m.amount || 0),
         0
     );
+
 
     const money = `${CURRENCIES[draft.currency] || "$"}${total.toFixed(2)}`;
 
@@ -377,9 +372,9 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
             return {
                 name: m.name || "Merchant",
                 amount,
+                breakdown: String(m.breakdown || "").trim(),
             };
         });
-
 
     const passengers = draft.passengers
         .filter((p) => p.name)
@@ -458,7 +453,11 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
             ? `There will be ${merchantRows.length} charge${merchantRows.length > 1 ? "s" : ""
             } on your card ending ${draft.cardLast4 || "____"
             }, from ${merchantRows
-                .map((m) => `${m.name} (${m.amount})`)
+                .map(
+                    (m) =>
+                        `${m.name} (${m.amount}${m.breakdown ? ` — ${m.breakdown}` : ""
+                        })`
+                )
                 .join(", ")}.`
             : `There will be charges on your card ending ${draft.cardLast4 || "____"
             }.`;
@@ -500,18 +499,18 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
         
         <div style="
           color:#ffffff;
-          font-size:10px;
+          font-size:12px;
           font-weight:700;
           letter-spacing:3px;
           line-height:1.2;
           margin-bottom:8px;
         ">
-          NEW BOOKING
+          ${escapeHtml(draft.headerLabel || "NEW BOOKING_______")}
         </div>
 
         <div style="
           color:#ffffff;
-          font-size:25px;
+          font-size:30px;
           font-weight:700;
           line-height:1.1;
         ">
@@ -901,10 +900,17 @@ ${paymentLinkHtml}
       <div style="font:13px Arial;color:#555;margin-top:3px">
         Reservations Desk
       </div>
-      ${draft.employeePhone
-            ? `<div style="font:13px Arial;color:#555;margin-top:3px">${escapeHtml(
-                draft.employeePhone
-            )}</div>`
+      ${draft.tncEmail
+            ? `<div style="font:13px Arial;color:#555;margin-top:3px">
+        Email: ${escapeHtml(draft.tncEmail)}
+      </div>`
+            : ""
+        }
+
+${draft.employeePhone
+            ? `<div style="font:13px Arial;color:#555;margin-top:3px">
+        Callback No: ${escapeHtml(draft.employeePhone)}
+      </div>`
             : ""
         }
     </div>
@@ -1069,11 +1075,56 @@ export default function EmailBuilder() {
         const symbol = CURRENCIES[draft.currency] || "$";
 
         const amount = (value) =>
-            value ? `${symbol}${Number(value).toFixed(2)}` : "____";
+            value !== undefined &&
+                value !== null &&
+                String(value).trim() !== ""
+                ? `${symbol}${Number(value).toFixed(2)}`
+                : "____";
 
         switch (type) {
+            case "new_miles":
+                return `This booking has been made using ${draft.milesUsed || "____"
+                    } miles.`;
+
             case "changes":
                 return "As per your request, your flight has been changed. Please review your updated itinerary below.";
+
+            case "seat_selection": {
+                const passengers = draft.passengers || [];
+                const seats = passengers
+                    .map((passenger, index) =>
+                        passenger?.name?.trim()
+                            ? draft.seatMap?.[index] || "____"
+                            : null
+                    )
+                    .filter(Boolean);
+
+                return `Your seat selection has been confirmed as requested: ${seats.length ? seats.join(", ") : "____"
+                    }.`;
+            }
+
+            case "pet_cabin":
+                if (draft.petPayMethod === "Online Payment") {
+                    return "Your pet-in-cabin request has been arranged as requested. The pet-in-cabin fee has been collected via online payment.";
+                }
+
+                if (draft.petPayMethod === "Pay at desk") {
+                    return "Your pet-in-cabin request has been arranged as requested. A pet-in-cabin fee is payable at the airport check-in desk.";
+                }
+
+                return "Your pet-in-cabin request has been arranged as requested.";
+
+            case "name_correction":
+                return "The passenger name has been corrected as requested.";
+
+            case "dob_correction":
+                return "The date of birth has been corrected as requested.";
+
+            case "unmr":
+                return "An Unaccompanied Minor (UNMR) reservation has been arranged as requested. Our team will coordinate the required assistance throughout the minor’s journey.";
+
+            case "ticket_reissue":
+                return "Your ticket has been re-issued as requested. Please review the updated details below.";
 
             case "cancel_credit":
                 return `As requested, your flight has been cancelled. A credit of ${amount(
@@ -1093,78 +1144,169 @@ export default function EmailBuilder() {
                         draft.cancelFee
                     )} has been deducted and is non-refundable)`
                     : ""
-                    }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
+                    }${draft.refundTimeline
+                        ? `, within ${draft.refundTimeline}`
+                        : ""
+                    }.`;
 
             case "cancel_miles_refund":
-                return `As requested, your flight has been cancelled. ${draft.milesUsed || "____"
-                    } miles and a refund of ${amount(
-                        draft.refundAmount
-                    )} are being processed${draft.cancelFee
+                return `As requested, your booking has been cancelled. ${draft.milesRefunded || "____"
+                    } miles have been refunded to your miles account${draft.refundAmount
+                        ? ` and a refund of ${amount(
+                            draft.refundAmount
+                        )} is being processed to your Original Payment Method`
+                        : ""
+                    }${draft.cancelFee
                         ? ` (a cancellation fee of ${amount(
                             draft.cancelFee
                         )} has been deducted and is non-refundable)`
                         : ""
-                    }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
+                    }${draft.refundTimeline
+                        ? `, within ${draft.refundTimeline}`
+                        : ""
+                    }.`;
 
             case "cancel_reissue":
-                return `Your booking ${draft.bookingNo || "____"
-                    } has been cancelled and re-issued.${draft.refundAmount
-                        ? ` A refund of ${amount(
-                            draft.refundAmount
-                        )} is being processed to your Original Payment Method${draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
-                        }.`
+                return `Your booking ${draft.bookingNo || "____"} has been cancelled and re-issued.${draft.refundAmount
+                    ? ` A refund of ${amount(
+                        draft.refundAmount
+                    )} is being processed to your Original Payment Method${draft.refundTimeline
+                        ? ` within ${draft.refundTimeline}`
                         : ""
+                    }.`
+                    : ""
                     }`;
 
             case "cancel_rebook":
-                return `Your booking ${draft.bookingNo || "____"
-                    } has been cancelled and a new booking ${draft.newBookingNo || "____"
+                return `Your booking ${draft.bookingNo || "____"} has been cancelled and a new booking ${draft.newBookingNo || "____"
                     } has been created.${draft.refundAmount
                         ? ` A refund of ${amount(
                             draft.refundAmount
-                        )} is being processed to your Original Payment Method${draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
+                        )} is being processed to your Original Payment Method${draft.refundTimeline
+                            ? ` within ${draft.refundTimeline}`
+                            : ""
                         }.`
                         : ""
                     }`;
 
-            case "name_correction":
-                return "The passenger name has been corrected as requested.";
-
-            case "dob_correction":
-                return "The date of birth has been corrected as requested.";
-
-            case "new_miles":
-                return "Your new booking has been confirmed using the applicable miles and payment details.";
-
-            case "seat_selection":
-                return "Your seat selection has been confirmed as requested.";
-
-            case "ticket_reissue":
-                return "Your ticket has been re-issued as requested. Please review the updated details below.";
-
-            case "unmr":
-                return "An Unaccompanied Minor (UNMR) reservation has been arranged as requested.";
-
-            case "pet_cabin":
-                return "Your pet-in-cabin request has been arranged as requested.";
-
             case "other":
-                return "";
+                return draft.headerLine || "";
 
             default:
                 return "";
         }
     };
 
+    const validateHeaderFields = () => {
+        const errors = {};
+        const type = draft.headerType;
+
+        switch (type) {
+            case "new_miles":
+                if (!String(draft.milesUsed || "").trim()) {
+                    errors.milesUsed = "Miles used is required.";
+                }
+                break;
+
+            case "seat_selection": {
+                const passengers = draft.passengers || [];
+
+                passengers.forEach((passenger, index) => {
+                    if (
+                        passenger?.name?.trim() &&
+                        !String(draft.seatMap?.[index] || "").trim()
+                    ) {
+                        errors[`seat-${index}`] =
+                            `Seat is required for passenger ${index + 1}.`;
+                    }
+                });
+                break;
+            }
+
+            case "pet_cabin":
+                if (!String(draft.petName || "").trim()) {
+                    errors.petName = "Pet name is required.";
+                }
+                if (!String(draft.petBreed || "").trim()) {
+                    errors.petBreed = "Breed is required.";
+                }
+                if (!String(draft.petWeight || "").trim()) {
+                    errors.petWeight = "Weight is required.";
+                }
+                if (!String(draft.petAge || "").trim()) {
+                    errors.petAge = "Age is required.";
+                }
+                break;
+
+            case "cancel_credit":
+                if (!String(draft.creditAmount || "").trim()) {
+                    errors.creditAmount = "Credit amount is required.";
+                }
+                break;
+
+            case "cancel_refund":
+            case "cancel_miles_refund":
+            case "cancel_reissue":
+                if (!String(draft.refundTimeline || "").trim()) {
+                    errors.refundTimeline = "Processing timeline is required.";
+                }
+                break;
+
+            case "cancel_rebook":
+                if (!String(draft.newBookingNo || "").trim()) {
+                    errors.newBookingNo = "New booking number is required.";
+                }
+                if (!String(draft.refundTimeline || "").trim()) {
+                    errors.refundTimeline = "Processing timeline is required.";
+                }
+                break;
+
+            case "other":
+                if (!String(draft.headerLabel || "").trim()) {
+                    errors.headerLabel = "Banner label is required.";
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        return errors;
+    };
+
+    const updateHeaderField = (key, value) => {
+        setDraft((old) => {
+            const previousAutoMessage = getHeaderMessage(old.headerType, old);
+            const shouldUpdateMessage = old.headerLine === previousAutoMessage;
+
+            const next = { ...old, [key]: value };
+
+            if (shouldUpdateMessage && old.headerType !== "other") {
+                next.headerLine = getHeaderMessage(old.headerType, next);
+            }
+
+            return next;
+        });
+
+        clearFieldError(key);
+    };
+
     const changeHeaderType = (type) => {
         const selected = HEADER_TYPES.find(([id]) => id === type);
         const label = selected?.[1] || "New Booking";
+
+        setFieldErrors({});
+        setError("");
 
         setDraft((old) => ({
             ...old,
             headerType: type,
             headerLabel: label,
-            headerLine: getHeaderMessage(type, old),
+            headerLine: getHeaderMessage(type, {
+                ...old,
+                headerType: type,
+                headerLabel: label,
+            }),
         }));
     };
 
@@ -1281,6 +1423,18 @@ export default function EmailBuilder() {
         setMessage("");
 
         if (sending) return;
+
+        setFieldErrors({});
+
+        const headerErrors = validateHeaderFields();
+
+        if (Object.keys(headerErrors).length > 0) {
+            setFieldErrors(headerErrors);
+            const firstError = Object.values(headerErrors)[0];
+            setError(firstError);
+            showToast("error", firstError);
+            return;
+        }
 
         const firstPassenger = draft.passengers.find((p) => p.name?.trim());
 
@@ -1717,45 +1871,392 @@ export default function EmailBuilder() {
                                 </select>
                             </Field>
 
-                            {draft.headerType === "pet_in_cabin" && (
+                            {/* NEW BOOKING WITH MILES */}
+                            {draft.headerType === "new_miles" && (
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    {[
-                                        ["petName", "Pet name"],
-                                        ["petBreed", "Breed"],
-                                        ["petWeight", "Weight"],
-                                        ["petAge", "Age"],
-                                    ].map(([key, label]) => (
-                                        <Field key={key} label={label}>
-                                            <input
-                                                value={draft[key] || ""}
-                                                onChange={(e) => update(key, e.target.value)}
-                                                className={inputClass}
-                                            />
-                                        </Field>
-                                    ))}
-
-                                    <Field label="Payment method (optional)">
-                                        <select
-                                            value={draft.petPayMethod || ""}
-                                            onChange={(e) => update("petPayMethod", e.target.value)}
-                                            className={inputClass}
-                                        >
-                                            <option value="">--none--</option>
-                                            <option>Online Payment</option>
-                                            <option>Pay at desk</option>
-                                        </select>
-                                    </Field>
-
-                                    <Field label="Payment amount ($, optional)">
+                                    <Field label="Miles used" required hint="Example: 50000">
                                         <input
                                             type="number"
+                                            min="0"
+                                            value={draft.milesUsed || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("milesUsed", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.milesUsed ? "border-red-500" : ""}`}
+                                            placeholder="e.g. 50000"
+                                        />
+                                        {fieldErrors.milesUsed && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.milesUsed}
+                                            </p>
+                                        )}
+                                    </Field>
+
+                                    <Field label="Amount paid ($, optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
                                             step="0.01"
-                                            value={draft.petPayAmount || ""}
-                                            onChange={(e) => update("petPayAmount", e.target.value)}
+                                            value={draft.milesDollars || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("milesDollars", e.target.value)
+                                            }
                                             className={inputClass}
+                                            placeholder="0.00"
                                         />
                                     </Field>
                                 </div>
+                            )}
+
+                            {/* SEAT SELECTION */}
+                            {draft.headerType === "seat_selection" && (
+                                <div className="space-y-4">
+                                    {(draft.passengers || []).map((passenger, index) => {
+                                        if (!passenger?.name?.trim()) return null;
+
+                                        return (
+                                            <Field
+                                                key={index}
+                                                label={`Passenger ${index + 1} — seat`}
+                                                required
+                                                hint="Enter seat per passenger, e.g. 12A"
+                                            >
+                                                <input
+                                                    value={draft.seatMap?.[index] || ""}
+                                                    onChange={(e) => {
+                                                        const nextSeats = [...(draft.seatMap || [])];
+                                                        nextSeats[index] = e.target.value;
+                                                        updateHeaderField("seatMap", nextSeats);
+                                                    }}
+                                                    className={`${inputClass} ${fieldErrors[`seat-${index}`] ? "border-red-500" : ""}`}
+                                                    placeholder="e.g. 12A"
+                                                />
+                                                {fieldErrors[`seat-${index}`] && (
+                                                    <p className="text-xs font-medium text-red-600">
+                                                        {fieldErrors[`seat-${index}`]}
+                                                    </p>
+                                                )}
+                                            </Field>
+                                        );
+                                    })}
+
+                                    {!draft.passengers?.some((p) => p?.name?.trim()) && (
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                                            Add at least one passenger in Section 3 before entering seat selection.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* PET IN CABIN */}
+                            {draft.headerType === "pet_cabin" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {[
+                                        ["petName", "Pet name", "e.g. Bella"],
+                                        ["petBreed", "Breed", "e.g. Pomeranian"],
+                                        ["petWeight", "Weight", "e.g. 5 kg"],
+                                        ["petAge", "Age", "e.g. 3 years"],
+                                    ].map(([key, label, placeholder]) => (
+                                        <Field key={key} label={label} required>
+                                            <input
+                                                value={draft[key] || ""}
+                                                onChange={(e) =>
+                                                    updateHeaderField(key, e.target.value)
+                                                }
+                                                className={`${inputClass} ${fieldErrors[key] ? "border-red-500" : ""}`}
+                                                placeholder={placeholder}
+                                            />
+                                            {fieldErrors[key] && (
+                                                <p className="text-xs font-medium text-red-600">
+                                                    {fieldErrors[key]}
+                                                </p>
+                                            )}
+                                        </Field>
+                                    ))}
+
+                                    <Field label="Fee payment (optional)">
+                                        <select
+                                            value={draft.petPayMethod || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("petPayMethod", e.target.value)
+                                            }
+                                            className={inputClass}
+                                        >
+                                            <option value="">--none--</option>
+                                            <option value="Online Payment">Online Payment</option>
+                                            <option value="Pay at desk">Pay at desk</option>
+                                        </select>
+                                    </Field>
+
+                                    <Field label="Fee amount ($, optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.petPayAmount || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("petPayAmount", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+
+                            {/* CANCELLATION WITH CREDIT */}
+                            {draft.headerType === "cancel_credit" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field label="Credit amount" required>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.creditAmount || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("creditAmount", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.creditAmount ? "border-red-500" : ""}`}
+                                            placeholder="0.00"
+                                        />
+                                        {fieldErrors.creditAmount && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.creditAmount}
+                                            </p>
+                                        )}
+                                    </Field>
+
+                                    <Field label="Cancellation fee (optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.cancelFee || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("cancelFee", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+
+                            {/* CANCELLATION WITH REFUND */}
+                            {draft.headerType === "cancel_refund" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field label="Refund amount ($, optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.refundAmount || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundAmount", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+
+                                    <Field label="Cancellation fee (optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.cancelFee || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("cancelFee", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+
+                                    <Field label="Processing timeline" required hint="Example: 12–16 weeks">
+                                        <input
+                                            value={draft.refundTimeline || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundTimeline", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.refundTimeline ? "border-red-500" : ""}`}
+                                            placeholder="e.g. 12–16 weeks"
+                                        />
+                                        {fieldErrors.refundTimeline && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.refundTimeline}
+                                            </p>
+                                        )}
+                                    </Field>
+                                </div>
+                            )}
+
+                            {/* CANCELLATION WITH MILES & REFUND */}
+                            {draft.headerType === "cancel_miles_refund" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field label="Miles refunded (optional)" hint="Example: 50000">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={draft.milesRefunded || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("milesRefunded", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="e.g. 50000"
+                                        />
+                                    </Field>
+
+                                    <Field label="Refund amount ($, optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.refundAmount || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundAmount", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+
+                                    <Field label="Cancellation fee (optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.cancelFee || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("cancelFee", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+
+                                    <Field label="Processing timeline" required>
+                                        <input
+                                            value={draft.refundTimeline || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundTimeline", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.refundTimeline ? "border-red-500" : ""}`}
+                                            placeholder="e.g. 12–16 weeks"
+                                        />
+                                        {fieldErrors.refundTimeline && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.refundTimeline}
+                                            </p>
+                                        )}
+                                    </Field>
+                                </div>
+                            )}
+
+                            {/* CANCEL & RE-ISSUE */}
+                            {draft.headerType === "cancel_reissue" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field label="Refund amount ($, optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.refundAmount || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundAmount", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+
+                                    <Field label="Processing timeline" required>
+                                        <input
+                                            value={draft.refundTimeline || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundTimeline", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.refundTimeline ? "border-red-500" : ""}`}
+                                            placeholder="e.g. 12–16 weeks"
+                                        />
+                                        {fieldErrors.refundTimeline && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.refundTimeline}
+                                            </p>
+                                        )}
+                                    </Field>
+                                </div>
+                            )}
+
+                            {/* CANCEL & RE-BOOK */}
+                            {draft.headerType === "cancel_rebook" && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field label="New booking number" required>
+                                        <input
+                                            value={draft.newBookingNo || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("newBookingNo", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.newBookingNo ? "border-red-500" : ""}`}
+                                            placeholder="e.g. 7ABQ2Z"
+                                        />
+                                        {fieldErrors.newBookingNo && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.newBookingNo}
+                                            </p>
+                                        )}
+                                    </Field>
+
+                                    <Field label="Refund amount ($, optional)">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={draft.refundAmount || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundAmount", e.target.value)
+                                            }
+                                            className={inputClass}
+                                            placeholder="0.00"
+                                        />
+                                    </Field>
+
+                                    <Field label="Processing timeline" required>
+                                        <input
+                                            value={draft.refundTimeline || ""}
+                                            onChange={(e) =>
+                                                updateHeaderField("refundTimeline", e.target.value)
+                                            }
+                                            className={`${inputClass} ${fieldErrors.refundTimeline ? "border-red-500" : ""}`}
+                                            placeholder="e.g. 12–16 weeks"
+                                        />
+                                        {fieldErrors.refundTimeline && (
+                                            <p className="text-xs font-medium text-red-600">
+                                                {fieldErrors.refundTimeline}
+                                            </p>
+                                        )}
+                                    </Field>
+                                </div>
+                            )}
+
+                            {/* OTHER */}
+                            {draft.headerType === "other" && (
+                                <Field label="Banner label" required hint="Example: Cancel & Re-Book">
+                                    <input
+                                        value={draft.headerLabel || ""}
+                                        onChange={(e) => {
+                                            update("headerLabel", e.target.value);
+                                            clearFieldError("headerLabel");
+                                        }}
+                                        className={`${inputClass} ${fieldErrors.headerLabel ? "border-red-500" : ""}`}
+                                        placeholder="e.g. Cancel & Re-Book"
+                                    />
+                                    {fieldErrors.headerLabel && (
+                                        <p className="text-xs font-medium text-red-600">
+                                            {fieldErrors.headerLabel}
+                                        </p>
+                                    )}
+                                </Field>
                             )}
 
                             <Field
@@ -2150,9 +2651,8 @@ export default function EmailBuilder() {
                             </Field>
 
                             <Field
-                                label="Toll-free number"
-                                required
-                                hint="Required — enter a full 10-digit US number."
+                                label="Employee Number / Callback No"
+                                hint="Callback number shown in the email"
                             >
                                 <input
                                     type="tel"
@@ -2167,6 +2667,20 @@ export default function EmailBuilder() {
                                             employeePhone: formatUSPhone(e.target.value),
                                         }))
                                     }
+                                />
+                            </Field>
+                            <Field
+                                label="Email"
+                                hint="Email address shown in the email signature"
+                            >
+                                <input
+                                    type="email"
+                                    value={draft.tncEmail || ""}
+                                    onChange={(e) =>
+                                        update("tncEmail", e.target.value)
+                                    }
+                                    className={inputClass}
+                                    placeholder="airlinesupport@reservationssupports.com"
                                 />
                             </Field>
 

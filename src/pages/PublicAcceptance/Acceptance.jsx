@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 const API_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    import.meta.env.VITE_API_BASE_URL;
 
 const Acceptance = () => {
     const { token } = useParams();
@@ -35,7 +35,7 @@ const Acceptance = () => {
                 if (!response.ok) {
                     throw new Error(
                         result?.message ||
-                            "This authorization link is invalid or has expired."
+                        "This authorization link is invalid or has expired."
                     );
                 }
 
@@ -47,7 +47,7 @@ const Acceptance = () => {
 
                 setError(
                     err?.message ||
-                        "This authorization link is invalid or has expired."
+                    "This authorization link is invalid or has expired."
                 );
 
                 setStatus("error");
