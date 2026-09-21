@@ -634,7 +634,9 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
                 Total amount to be charged
             </td>
 
-            <td style="
+            <td 
+            id="amount"
+            style="
                 padding:12px 8px;
                 font:700 14px Arial;
                 text-align:right;
