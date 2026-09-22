@@ -8,10 +8,7 @@ const getToken = () => {
   return sessionStorage.getItem("travel_crm_token");
 };
 
-const apiRequest = async (
-  endpoint,
-  options = {}
-) => {
+export const apiRequest = async (endpoint, options = {}) => {
   const token = getToken();
 
   const headers = {
@@ -42,13 +39,8 @@ const apiRequest = async (
   }
 
   if (response.status === 401) {
-    sessionStorage.removeItem(
-      "travel_crm_token"
-    );
-
-    sessionStorage.removeItem(
-      "travel_crm_user"
-    );
+    sessionStorage.removeItem("travel_crm_token");
+    sessionStorage.removeItem("travel_crm_user");
 
     window.location.href = "/login";
 
@@ -59,44 +51,35 @@ const apiRequest = async (
 
   if (!response.ok) {
     throw new Error(
-      result?.message ||
-        "Something went wrong"
+      result?.message || "Something went wrong"
     );
   }
 
   return result;
 };
 
-const apiGet = (endpoint) => {
+export const apiGet = (endpoint) => {
   return apiRequest(endpoint, {
     method: "GET"
   });
 };
 
-const apiPost = (endpoint, data) => {
+export const apiPost = (endpoint, data) => {
   return apiRequest(endpoint, {
     method: "POST",
     body: JSON.stringify(data)
   });
 };
 
-const apiPatch = (endpoint, data) => {
+export const apiPatch = (endpoint, data) => {
   return apiRequest(endpoint, {
     method: "PATCH",
     body: JSON.stringify(data)
   });
 };
 
-const apiDelete = (endpoint) => {
+export const apiDelete = (endpoint) => {
   return apiRequest(endpoint, {
     method: "DELETE"
   });
-};
-
-export {
-  apiRequest,
-  apiGet,
-  apiPost,
-  apiPatch,
-  apiDelete
 };
