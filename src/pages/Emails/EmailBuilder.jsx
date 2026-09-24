@@ -134,10 +134,9 @@ Travel Documents
 
 You are responsible for having valid visas and travel documents. We are not liable for denied entry or boarding.
 
-Refunds on Agency/Third-Party Bookings
+Refunds for Agency or Third-Party Bookings
 
-Refunds go to the issuing agency. Contact them directly. No chargebacks will be accepted by our agency.
-
+If your reservation was made through a travel agency, booking agent, or other third-party provider, any eligible refund will be processed and returned to the original third-party booking provider in accordance with the applicable fare rules and payment terms. No chargebacks will be accepted by us.
 Disputes
 
 If you have any questions or disputes, please contact us directly. We are committed to resolving issues promptly and efficiently. Please note, we do not entertain disputes filed directly through your bank.
@@ -148,7 +147,8 @@ We may contact you for promotional or advertising purposes.
 
 Declaration
 
-If our agency is required to take legal action to enforce these Terms and Conditions, you agree to cover all related legal fees, litigation costs, and any other remedies entitled by law. By confirming this booking, you acknowledge that the travel dates and times are accurate, your name matches your government-issued ID or passport, and you are aware of all applicable fare rules and conditions. You also agree to reconfirm your flight at least 72 hours prior to departure.
+If it becomes necessary to take legal action to enforce these Terms and Conditions, you agree to be responsible for all applicable legal fees, litigation costs, and any other remedies permitted by law.By confirming this booking, you acknowledge that the travel dates and times are accurate, your name matches your government-issued ID or passport, and you are aware of all applicable fare rules and conditions. You also agree to reconfirm your flight at least 72 hours prior to departure.
+
 
 Customer Support
 
@@ -160,7 +160,7 @@ Should your itinerary change, please contact us immediately. While we will do ou
 
 Force Majeure
 
-Reservations Desk is not liable for any failure to perform our obligations under these terms due to circumstances beyond our control, including but not limited to natural disasters, war, terrorism, or changes in government regulations.
+We are not liable for any failure to perform our obligations under these terms due to circumstances beyond our control, including but not limited to natural disasters, war, terrorism, or changes in government regulations.
 
 Promotional Communications
 
@@ -378,8 +378,7 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
       (p) =>
         `<tr><td style="padding:7px 0;font:13px Arial">${escapeHtml(
           p.name,
-        )}</td><td style="padding:7px 0;font:13px Arial;text-align:right">${
-          p.dob || "____"
+        )}</td><td style="padding:7px 0;font:13px Arial;text-align:right">${p.dob || "____"
         }</td></tr>`,
     )
     .join("");
@@ -447,19 +446,16 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
 
   const paymentSentence =
     merchantRows.length > 0
-      ? `There will be ${merchantRows.length} charge${
-          merchantRows.length > 1 ? "s" : ""
-        } on your card ending ${draft.cardLast4 || "____"}, from ${merchantRows
-          .map(
-            (m) =>
-              `${m.name} (${m.amount}${
-                m.breakdown ? ` — ${m.breakdown}` : ""
-              })`,
-          )
-          .join(", ")}.`
-      : `There will be charges on your card ending ${
-          draft.cardLast4 || "____"
-        }.`;
+      ? `There will be ${merchantRows.length} charge${merchantRows.length > 1 ? "s" : ""
+      } on your card ending ${draft.cardLast4 || "____"}, from ${merchantRows
+        .map(
+          (m) =>
+            `${m.name} (${m.amount}${m.breakdown ? ` — ${m.breakdown}` : ""
+            })`,
+        )
+        .join(", ")}.`
+      : `There will be charges on your card ending ${draft.cardLast4 || "____"
+      }.`;
 
   const snips = draft.itineraryImages
     .map(
@@ -474,13 +470,12 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
 <body style="margin:0;background:#f4f6f8;padding:24px">
 <div style="max-width:760px;margin:auto;background:#fff;border:1px solid #e2e5e9;border-radius:14px;overflow:hidden">
 
-  ${
-    draft.bannerImage
+  ${draft.bannerImage
       ? `<div style="text-align:center;padding:14px;background:#fff">
           <img src="${draft.bannerImage}" alt="Banner" style="max-width:100%;max-height:150px;object-fit:contain">
          </div>`
       : ""
-  }
+    }
 
   <div style="padding:24px 28px;border-bottom:1px solid #eee">
     <div 
@@ -558,12 +553,11 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
 
     ${paragraphHtml(greeting)}
 
-    ${
-      message
-        ? `<div style="font:14px Arial;color:#263248;line-height:1.65;margin:15px 0">${paragraphHtml(
-            message,
-          )}</div>`
-        : ""
+    ${message
+      ? `<div style="font:14px Arial;color:#263248;line-height:1.65;margin:15px 0">${paragraphHtml(
+        message,
+      )}</div>`
+      : ""
     }
 
     <h3 style="
@@ -643,9 +637,9 @@ const buildEmailHtml = (draft, acceptanceUrl = "#") => {
                 border-top:1px solid #e5e7eb;
             ">
                 ${currencySymbol}${total.toLocaleString("en-US", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 2,
-                })}
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}
             </td>
         </tr>
     </tfoot>
@@ -906,21 +900,19 @@ ${paymentLinkHtml}
       <div style="font:13px Arial;color:#555;margin-top:3px">
         Reservations Desk
       </div>
-      ${
-        draft.tncEmail
-          ? `<div style="font:13px Arial;color:#555;margin-top:3px">
+      ${draft.tncEmail
+      ? `<div style="font:13px Arial;color:#555;margin-top:3px">
         Email: ${escapeHtml(draft.tncEmail)}
       </div>`
-          : ""
-      }
+      : ""
+    }
 
-${
-  draft.employeePhone
-    ? `<div style="font:13px Arial;color:#555;margin-top:3px">
+${draft.employeePhone
+      ? `<div style="font:13px Arial;color:#555;margin-top:3px">
         Callback No: ${escapeHtml(draft.employeePhone)}
       </div>`
-    : ""
-}
+      : ""
+    }
     </div>
 
   </div>
@@ -953,11 +945,11 @@ const termsToEmailHtml = (text) =>
 
       return heading
         ? `<div style="font:700 12px Arial;color:#172033;margin:13px 0 5px">${escapeHtml(
-            line,
-          )}</div>`
+          line,
+        )}</div>`
         : `<div style="font:11.5px/1.55 Arial;color:#4b5563;margin-bottom:5px">${escapeHtml(
-            line,
-          )}</div>`;
+          line,
+        )}</div>`;
     })
     .join("");
 
@@ -1011,7 +1003,7 @@ export default function EmailBuilder() {
   useEffect(() => {
     getLeadsApi()
       .then((res) => setLeads(res?.data || []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const filteredAirlines = useMemo(() => {
@@ -1092,9 +1084,8 @@ export default function EmailBuilder() {
 
     switch (type) {
       case "new_miles":
-        return `This booking has been made using ${
-          draft.milesUsed || "____"
-        } miles.`;
+        return `This booking has been made using ${draft.milesUsed || "____"
+          } miles.`;
 
       case "changes":
         return "As per your request, your flight has been changed. Please review your updated itinerary below.";
@@ -1107,9 +1098,8 @@ export default function EmailBuilder() {
           )
           .filter(Boolean);
 
-        return `Your seat selection has been confirmed as requested: ${
-          seats.length ? seats.join(", ") : "____"
-        }.`;
+        return `Your seat selection has been confirmed as requested: ${seats.length ? seats.join(", ") : "____"
+          }.`;
       }
 
       case "pet_cabin":
@@ -1138,65 +1128,55 @@ export default function EmailBuilder() {
       case "cancel_credit":
         return `As requested, your flight has been cancelled. A credit of ${amount(
           draft.creditAmount,
-        )} is being issued${
-          draft.cancelFee
-            ? ` (a cancellation fee of ${amount(
-                draft.cancelFee,
-              )} has been deducted and is non-refundable)`
-            : ""
-        }.`;
+        )} is being issued${draft.cancelFee
+          ? ` (a cancellation fee of ${amount(
+            draft.cancelFee,
+          )} has been deducted and is non-refundable)`
+          : ""
+          }.`;
 
       case "cancel_refund":
         return `As requested, your flight has been cancelled. A refund of ${amount(
           draft.refundAmount,
-        )} is being processed to your Original Payment Method${
-          draft.cancelFee
-            ? ` (a cancellation fee of ${amount(
-                draft.cancelFee,
-              )} has been deducted and is non-refundable)`
-            : ""
-        }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
+        )} is being processed to your Original Payment Method${draft.cancelFee
+          ? ` (a cancellation fee of ${amount(
+            draft.cancelFee,
+          )} has been deducted and is non-refundable)`
+          : ""
+          }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
 
       case "cancel_miles_refund":
-        return `As requested, your booking has been cancelled. ${
-          draft.milesRefunded || "____"
-        } miles have been refunded to your miles account${
-          draft.refundAmount
+        return `As requested, your booking has been cancelled. ${draft.milesRefunded || "____"
+          } miles have been refunded to your miles account${draft.refundAmount
             ? ` and a refund of ${amount(
-                draft.refundAmount,
-              )} is being processed to your Original Payment Method`
+              draft.refundAmount,
+            )} is being processed to your Original Payment Method`
             : ""
-        }${
-          draft.cancelFee
+          }${draft.cancelFee
             ? ` (a cancellation fee of ${amount(
-                draft.cancelFee,
-              )} has been deducted and is non-refundable)`
+              draft.cancelFee,
+            )} has been deducted and is non-refundable)`
             : ""
-        }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
+          }${draft.refundTimeline ? `, within ${draft.refundTimeline}` : ""}.`;
 
       case "cancel_reissue":
-        return `Your booking ${draft.bookingNo || "____"} has been cancelled and re-issued.${
-          draft.refundAmount
-            ? ` A refund of ${amount(
-                draft.refundAmount,
-              )} is being processed to your Original Payment Method${
-                draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
-              }.`
-            : ""
-        }`;
+        return `Your booking ${draft.bookingNo || "____"} has been cancelled and re-issued.${draft.refundAmount
+          ? ` A refund of ${amount(
+            draft.refundAmount,
+          )} is being processed to your Original Payment Method${draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
+          }.`
+          : ""
+          }`;
 
       case "cancel_rebook":
-        return `Your booking ${draft.bookingNo || "____"} has been cancelled and a new booking ${
-          draft.newBookingNo || "____"
-        } has been created.${
-          draft.refundAmount
+        return `Your booking ${draft.bookingNo || "____"} has been cancelled and a new booking ${draft.newBookingNo || "____"
+          } has been created.${draft.refundAmount
             ? ` A refund of ${amount(
-                draft.refundAmount,
-              )} is being processed to your Original Payment Method${
-                draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
-              }.`
+              draft.refundAmount,
+            )} is being processed to your Original Payment Method${draft.refundTimeline ? ` within ${draft.refundTimeline}` : ""
+            }.`
             : ""
-        }`;
+          }`;
 
       case "other":
         return draft.headerLine || "";
@@ -1579,7 +1559,7 @@ export default function EmailBuilder() {
 
       setMessage(
         result?.message ||
-          "Email sent successfully. Waiting for customer authorization.",
+        "Email sent successfully. Waiting for customer authorization.",
       );
       showToast(
         "success",
@@ -1644,11 +1624,10 @@ export default function EmailBuilder() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       {toast && (
         <div
-          className={`fixed bottom-5 right-5 z-[100] max-w-sm rounded-xl border px-4 py-3 shadow-xl ${
-            toast.type === "error"
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
+          className={`fixed bottom-5 right-5 z-[100] max-w-sm rounded-xl border px-4 py-3 shadow-xl ${toast.type === "error"
+            ? "border-red-200 bg-red-50 text-red-700"
+            : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
         >
           <div className="flex items-start gap-3">
             <div className="flex-1 text-sm font-semibold">{toast.text}</div>
@@ -1680,11 +1659,10 @@ export default function EmailBuilder() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize ${
-                  activeTab === tab
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600"
-                }`}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize ${activeTab === tab
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-600"
+                  }`}
               >
                 {tab === "draft" ? "Draft email" : tab}
               </button>
@@ -1761,11 +1739,10 @@ export default function EmailBuilder() {
                 <input
                   value={airlineSearch}
                   onChange={(e) => setAirlineSearch(e.target.value)}
-                  className={`${inputClass} ${
-                    fieldErrors.airline
-                      ? "border-red-500 focus:border-red-500 focus:ring-red-100"
-                      : ""
-                  }`}
+                  className={`${inputClass} ${fieldErrors.airline
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-100"
+                    : ""
+                    }`}
                   placeholder="Search airline / cruise line..."
                 />
                 {fieldErrors.airline && (
